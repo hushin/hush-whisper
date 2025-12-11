@@ -12,6 +12,28 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
 
+/// Expand Windows environment variables like %APPDATA%
+fn expand_env_vars(path: &str) -> String {
+    let mut result = path.to_string();
+
+    // Find and replace all %VAR% patterns
+    while let Some(start) = result.find('%') {
+        if let Some(end) = result[start + 1..].find('%') {
+            let var_name = &result[start + 1..start + 1 + end];
+            if let Ok(value) = std::env::var(var_name) {
+                result = result.replace(&format!("%{}%", var_name), &value);
+            } else {
+                // If variable not found, skip this one
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    result
+}
+
 // Application state
 pub struct AppState {
     audio_capture: Mutex<Option<AudioCapture>>,
@@ -46,9 +68,13 @@ async fn initialize_whisper(
 ) -> Result<String, String> {
     tracing::info!("Initializing Whisper with model: {}", model_path);
 
-    let path = PathBuf::from(&model_path);
+    // Expand environment variables like %APPDATA%
+    let expanded_path = expand_env_vars(&model_path);
+    tracing::info!("Expanded path: {}", expanded_path);
+
+    let path = PathBuf::from(&expanded_path);
     if !path.exists() {
-        return Err(format!("Model file not found: {}", model_path));
+        return Err(format!("Model file not found: {}", expanded_path));
     }
 
     let transcriber = WhisperTranscriber::new(path)
