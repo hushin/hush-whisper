@@ -8,9 +8,13 @@ use clipboard::ClipboardManager;
 use shortcuts::ShortcutHandler;
 use whisper::WhisperTranscriber;
 
+use futures_util::StreamExt;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
+use tokio::io::AsyncWriteExt;
+
+const MODEL_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin";
 
 /// Expand Windows environment variables like %APPDATA%
 fn expand_env_vars(path: &str) -> String {
@@ -61,9 +65,90 @@ impl AppState {
     }
 }
 
+#[derive(Clone, serde::Serialize)]
+struct DownloadProgress {
+    downloaded: u64,
+    total: u64,
+    percentage: f64,
+}
+
+#[tauri::command]
+async fn download_model(app: AppHandle, model_path: String) -> Result<String, String> {
+    let expanded_path = expand_env_vars(&model_path);
+    let path = PathBuf::from(&expanded_path);
+
+    // Check if already exists
+    if path.exists() {
+        return Ok("Model already exists".to_string());
+    }
+
+    // Create parent directory if needed
+    if let Some(parent) = path.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    tracing::info!("Downloading model from {} to {}", MODEL_URL, expanded_path);
+
+    // Start download
+    let client = reqwest::Client::new();
+    let response = client
+        .get(MODEL_URL)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to start download: {}", e))?;
+
+    let total_size = response.content_length().unwrap_or(0);
+    tracing::info!("Total size: {} bytes", total_size);
+
+    // Create temp file
+    let temp_path = path.with_extension("bin.tmp");
+    let mut file = tokio::fs::File::create(&temp_path)
+        .await
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+
+    let mut downloaded: u64 = 0;
+    let mut stream = response.bytes_stream();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("Download error: {}", e))?;
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| format!("Failed to write file: {}", e))?;
+
+        downloaded += chunk.len() as u64;
+
+        let percentage = if total_size > 0 {
+            (downloaded as f64 / total_size as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        // Emit progress event
+        let _ = app.emit(
+            "download-progress",
+            DownloadProgress {
+                downloaded,
+                total: total_size,
+                percentage,
+            },
+        );
+    }
+
+    // Rename temp file to final path
+    tokio::fs::rename(&temp_path, &path)
+        .await
+        .map_err(|e| format!("Failed to finalize download: {}", e))?;
+
+    tracing::info!("Download complete: {}", expanded_path);
+    Ok("Download complete".to_string())
+}
+
 #[tauri::command]
 async fn initialize_whisper(
     state: State<'_, AppState>,
+    app: AppHandle,
     model_path: String,
 ) -> Result<String, String> {
     tracing::info!("Initializing Whisper with model: {}", model_path);
@@ -73,8 +158,17 @@ async fn initialize_whisper(
     tracing::info!("Expanded path: {}", expanded_path);
 
     let path = PathBuf::from(&expanded_path);
+
+    // If model doesn't exist, download it
     if !path.exists() {
-        return Err(format!("Model file not found: {}", expanded_path));
+        tracing::info!("Model not found, starting download...");
+        app.emit("download-started", ())
+            .map_err(|e| format!("Failed to emit event: {}", e))?;
+
+        download_model(app.clone(), model_path.clone()).await?;
+
+        app.emit("download-complete", ())
+            .map_err(|e| format!("Failed to emit event: {}", e))?;
     }
 
     let transcriber = WhisperTranscriber::new(path)
@@ -255,6 +349,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             initialize_whisper,
+            download_model,
             start_recording,
             stop_recording,
             toggle_recording,

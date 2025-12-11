@@ -3,26 +3,45 @@
   import { listen } from "@tauri-apps/api/event";
   import { onMount } from "svelte";
 
+  interface DownloadProgress {
+    downloaded: number;
+    total: number;
+    percentage: number;
+  }
+
   let modelPath = $state("%APPDATA%\\voice-input\\models\\ggml-large-v3-turbo.bin");
   let isModelInitialized = $state(false);
   let isRecording = $state(false);
   let isTranscribing = $state(false);
+  let isDownloading = $state(false);
+  let downloadProgress = $state<DownloadProgress | null>(null);
   let transcriptionResult = $state("");
   let statusMessage = $state("モデルを初期化してください");
   let errorMessage = $state("");
 
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  }
+
   async function initializeWhisper() {
     try {
       errorMessage = "";
-      statusMessage = "モデルを読み込み中...";
+      statusMessage = "モデルを確認中...";
 
-      // Pass the path as-is to Rust backend (environment variables will be expanded there if needed)
       await invoke("initialize_whisper", { modelPath });
       isModelInitialized = true;
+      isDownloading = false;
+      downloadProgress = null;
       statusMessage = "準備完了 - Ctrl+Space で録音開始/停止";
     } catch (error) {
       errorMessage = `モデル初期化エラー: ${error}`;
       statusMessage = "エラー";
+      isDownloading = false;
+      downloadProgress = null;
       console.error(error);
     }
   }
@@ -39,6 +58,28 @@
   }
 
   onMount(() => {
+    // Listen for download events
+    const unlistenDownloadStarted = listen("download-started", () => {
+      isDownloading = true;
+      downloadProgress = null;
+      statusMessage = "モデルをダウンロード中...";
+      console.log("Download started");
+    });
+
+    const unlistenDownloadProgress = listen<DownloadProgress>(
+      "download-progress",
+      (event) => {
+        downloadProgress = event.payload;
+        statusMessage = `ダウンロード中... ${event.payload.percentage.toFixed(1)}%`;
+      }
+    );
+
+    const unlistenDownloadComplete = listen("download-complete", () => {
+      isDownloading = false;
+      statusMessage = "ダウンロード完了 - モデルを読み込み中...";
+      console.log("Download complete");
+    });
+
     // Listen for recording events
     const unlistenRecordingStarted = listen("recording-started", () => {
       isRecording = true;
@@ -74,6 +115,9 @@
 
     // Cleanup listeners on unmount
     return () => {
+      unlistenDownloadStarted.then((fn) => fn());
+      unlistenDownloadProgress.then((fn) => fn());
+      unlistenDownloadComplete.then((fn) => fn());
       unlistenRecordingStarted.then((fn) => fn());
       unlistenRecordingStopped.then((fn) => fn());
       unlistenTranscriptionStarted.then((fn) => fn());
@@ -84,7 +128,7 @@
 </script>
 
 <main class="container">
-  <h1>🎤 VoiceInput</h1>
+  <h1>VoiceInput</h1>
   <p class="subtitle">ローカル音声入力アプリ</p>
 
   <div class="section">
@@ -94,17 +138,42 @@
         type="text"
         bind:value={modelPath}
         placeholder="Whisperモデルのパス"
-        disabled={isModelInitialized}
+        disabled={isModelInitialized || isDownloading}
         class="model-path-input"
       />
       <button
         onclick={initializeWhisper}
-        disabled={isModelInitialized}
+        disabled={isModelInitialized || isDownloading}
         class="init-button"
       >
-        {isModelInitialized ? "✓ 初期化済み" : "モデルを読み込む"}
+        {#if isDownloading}
+          ダウンロード中...
+        {:else if isModelInitialized}
+          初期化済み
+        {:else}
+          モデルを読み込む
+        {/if}
       </button>
     </div>
+
+    {#if isDownloading && downloadProgress}
+      <div class="download-progress">
+        <div class="progress-bar">
+          <div
+            class="progress-fill"
+            style="width: {downloadProgress.percentage}%"
+          ></div>
+        </div>
+        <p class="progress-text">
+          {formatBytes(downloadProgress.downloaded)} / {formatBytes(downloadProgress.total)}
+          ({downloadProgress.percentage.toFixed(1)}%)
+        </p>
+      </div>
+    {/if}
+
+    <p class="model-hint">
+      モデルが存在しない場合は自動的にダウンロードされます（約1.5GB）
+    </p>
   </div>
 
   <div class="section">
@@ -129,7 +198,7 @@
   <div class="section">
     <h2>ステータス</h2>
     <div class="status-display">
-      <p class="status" class:processing={isRecording || isTranscribing}>
+      <p class="status" class:processing={isRecording || isTranscribing || isDownloading}>
         {statusMessage}
       </p>
       {#if errorMessage}
@@ -224,6 +293,37 @@
     color: #999;
   }
 
+  .model-hint {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: #666;
+  }
+
+  .download-progress {
+    margin-top: 1rem;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background-color: #396cd8;
+    transition: width 0.3s ease;
+  }
+
+  .progress-text {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: #666;
+    text-align: center;
+  }
+
   button {
     padding: 0.75rem 1.5rem;
     border: none;
@@ -242,6 +342,7 @@
   .init-button {
     background-color: #396cd8;
     color: white;
+    min-width: 160px;
   }
 
   .init-button:hover:not(:disabled) {
@@ -373,6 +474,18 @@
     .model-path-input:disabled {
       background-color: #333;
       color: #666;
+    }
+
+    .model-hint {
+      color: #888;
+    }
+
+    .progress-bar {
+      background-color: #444;
+    }
+
+    .progress-text {
+      color: #aaa;
     }
 
     .result-display {
