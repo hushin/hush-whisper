@@ -33,13 +33,17 @@ impl WhisperTranscriber {
         let mut state = self.ctx.create_state()?;
         state.full(params, audio_data)?;
 
-        let num_segments = state.full_n_segments()?;
+        let num_segments = state.full_n_segments();
         tracing::info!("Transcription complete. Segments: {}", num_segments);
 
         let mut result = String::new();
         for i in 0..num_segments {
-            let segment = state.full_get_segment_text(i)?;
-            result.push_str(&segment);
+            if let Some(segment) = state.get_segment(i) {
+                // Use to_str_lossy to handle any encoding issues gracefully
+                if let Ok(text) = segment.to_str_lossy() {
+                    result.push_str(&text);
+                }
+            }
         }
 
         Ok(result.trim().to_string())

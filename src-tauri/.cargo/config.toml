@@ -1,0 +1,4 @@
+# Configuration for building whisper-rs on Windows
+# Uses Ninja generator to avoid Visual Studio version compatibility issues
+[env]
+CMAKE_GENERATOR = "Ninja"

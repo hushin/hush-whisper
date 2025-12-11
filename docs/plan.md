@@ -88,16 +88,17 @@ whisper-rs = { version = "0.15", features = ["cuda"] }
 
 **タスク**:
 
-- [ ] whisper-rs 初期化（CUDA 有効）- **保留中**
-- [ ] ggml-large-v3-turbo.bin 読み込み - **保留中**
-- [ ] 日本語指定で推論実行 - **保留中**
+- [x] whisper-rs 初期化（CPU版）
+- [x] ggml-large-v3-turbo.bin 読み込み
+- [x] 日本語指定で推論実行
 - [x] 結果をフロントエンドへ送信
 
-**現在の状況**:
-- Visual Studio 18 の cmake サポート問題により、whisper-rs のビルドが失敗
-- 一時的にダミーモードで動作確認中
-- 基本的な録音・UI 機能は動作可能
-- Whisper 統合は cmake 問題解決後に実装予定
+**実装済み**: `src-tauri/src/whisper/transcribe.rs`
+
+**cmake問題の解決策**:
+- Visual Studio 18 (2026) は cmake クレートでまだサポートされていない
+- 解決策: CMAKE_GENERATOR=Ninja を使用
+- `.cargo/config.toml` に設定を追加済み
 
 **モデルパス**: `%APPDATA%/voice-input/models/`
 

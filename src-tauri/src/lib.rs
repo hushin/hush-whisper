@@ -1,13 +1,14 @@
 mod audio;
 mod clipboard;
 mod shortcuts;
-// mod whisper; // Temporarily disabled
+mod whisper;
 
 use audio::{AudioCapture, Resampler};
 use clipboard::ClipboardManager;
 use shortcuts::ShortcutHandler;
-// use whisper::WhisperTranscriber; // Temporarily disabled
+use whisper::WhisperTranscriber;
 
+use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
 
@@ -16,7 +17,7 @@ pub struct AppState {
     audio_capture: Mutex<Option<AudioCapture>>,
     // Stream is not stored here because it's not Send
     active_stream: Mutex<Option<Box<cpal::Stream>>>,
-    // whisper: Mutex<Option<WhisperTranscriber>>, // Temporarily disabled
+    whisper: Mutex<Option<WhisperTranscriber>>,
     clipboard: Mutex<Option<ClipboardManager>>,
     is_recording: Mutex<bool>,
 }
@@ -31,7 +32,7 @@ impl AppState {
         Self {
             audio_capture: Mutex::new(None),
             active_stream: Mutex::new(None),
-            // whisper: Mutex::new(None), // Temporarily disabled
+            whisper: Mutex::new(None),
             clipboard: Mutex::new(None),
             is_recording: Mutex::new(false),
         }
@@ -40,15 +41,23 @@ impl AppState {
 
 #[tauri::command]
 async fn initialize_whisper(
-    _state: State<'_, AppState>,
+    state: State<'_, AppState>,
     model_path: String,
 ) -> Result<String, String> {
-    tracing::info!("Whisper initialization requested with model: {}", model_path);
+    tracing::info!("Initializing Whisper with model: {}", model_path);
 
-    // Temporarily disabled - will enable once cmake issues are resolved
-    tracing::warn!("Whisper is temporarily disabled. Using dummy mode for testing.");
+    let path = PathBuf::from(&model_path);
+    if !path.exists() {
+        return Err(format!("Model file not found: {}", model_path));
+    }
 
-    Ok("Whisper initialization skipped (dummy mode)".to_string())
+    let transcriber = WhisperTranscriber::new(path)
+        .map_err(|e| format!("Failed to initialize Whisper: {}", e))?;
+
+    *state.whisper.lock().unwrap() = Some(transcriber);
+
+    tracing::info!("Whisper initialized successfully");
+    Ok("Whisper initialized successfully".to_string())
 }
 
 #[tauri::command]
@@ -115,6 +124,11 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
         sample_rate
     );
 
+    // Check if we have any audio data
+    if audio_data.is_empty() {
+        return Err("No audio data captured".to_string());
+    }
+
     // Resample to 16kHz for Whisper
     let resampler = Resampler::new(16000);
     let resampled_data = resampler
@@ -123,17 +137,26 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
 
     tracing::info!("Resampled to {} samples", resampled_data.len());
 
-    // Transcribe (temporarily using dummy text)
+    // Transcribe
     app.emit("transcription-started", ())
         .map_err(|e| format!("Failed to emit event: {}", e))?;
 
-    // Dummy transcription for testing without Whisper
-    let text = format!(
-        "[デモモード] {}サンプルの音声を録音しました。Whisperモデルを統合すると、ここに認識結果が表示されます。",
-        resampled_data.len()
-    );
+    let whisper_guard = state.whisper.lock().unwrap();
+    let text = if let Some(whisper) = whisper_guard.as_ref() {
+        // Use Whisper for transcription
+        whisper
+            .transcribe(&resampled_data)
+            .map_err(|e| format!("Failed to transcribe: {}", e))?
+    } else {
+        // Fallback to dummy mode if Whisper not initialized
+        tracing::warn!("Whisper not initialized, using dummy mode");
+        format!(
+            "[デモモード] {}サンプルの音声を録音しました。モデルを読み込んでください。",
+            resampled_data.len()
+        )
+    };
 
-    tracing::info!("Dummy transcription result: {}", text);
+    tracing::info!("Transcription result: {}", text);
 
     // Copy to clipboard
     let mut clipboard_guard = state.clipboard.lock().unwrap();

@@ -29,8 +29,8 @@ tokio = { version = "1", features = ["full"] }
 cpal = "0.15"
 rubato = "0.16"
 
-# Whisper (Phase 1) - Temporarily disabled due to cmake build issues
-# whisper-rs = "0.15"
+# Whisper (Phase 1)
+whisper-rs = "0.15"
 
 # Clipboard
 arboard = "3"
