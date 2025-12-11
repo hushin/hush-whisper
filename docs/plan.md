@@ -28,7 +28,7 @@ Windows 向け SuperWhisper 風ローカル音声入力アプリ。
 
 ## Phase 1: MVP（基本動作）
 
-**目標**: Push-to-Talk で音声認識 → テキスト出力
+**目標**: 録音開始/停止 で音声認識 → テキスト出力
 
 ### 1.1 プロジェクト初期化
 
@@ -65,10 +65,9 @@ whisper-rs = { version = "0.15", features = ["cuda"] }
 **タスク**:
 
 - [ ] tauri-plugin-global-shortcut 設定
-- [ ] Ctrl+Shift+; で Push-to-Talk
-- [ ] 録音開始/停止イベント発火
+- [ ] Ctrl+Space で 録音開始/停止
 
-**参考実装**: `src-tauri/src/shortcuts/mod.rs`
+**参考実装**: `refs/mod.rs`
 
 ### 1.3 音声キャプチャ
 
