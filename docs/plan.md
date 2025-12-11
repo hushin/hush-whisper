@@ -39,9 +39,9 @@ cd voice-input
 
 **タスク**:
 
-- [ ] Tauri 2.0 プロジェクト作成
-- [ ] Cargo.toml 依存関係設定
-- [ ] 基本ディレクトリ構造作成
+- [x] Tauri 2.0 プロジェクト作成
+- [x] Cargo.toml 依存関係設定
+- [x] 基本ディレクトリ構造作成
 
 **Cargo.toml（初期）**:
 
@@ -64,18 +64,20 @@ whisper-rs = { version = "0.15", features = ["cuda"] }
 
 **タスク**:
 
-- [ ] tauri-plugin-global-shortcut 設定
-- [ ] Ctrl+Space で 録音開始/停止
+- [x] tauri-plugin-global-shortcut 設定
+- [x] Ctrl+Space で 録音開始/停止
 
-**参考実装**: `refs/mod.rs`
+**実装済み**: `src-tauri/src/shortcuts/handler.rs`
 
 ### 1.3 音声キャプチャ
 
 **タスク**:
 
-- [ ] cpal でマイク入力取得
-- [ ] 48kHz→16kHz リサンプリング（rubato）
-- [ ] f32 PCM データとしてバッファリング
+- [x] cpal でマイク入力取得
+- [x] 48kHz→16kHz リサンプリング（rubato）
+- [x] f32 PCM データとしてバッファリング
+
+**実装済み**: `src-tauri/src/audio/capture.rs`, `src-tauri/src/audio/resample.rs`
 
 **注意点**:
 
@@ -86,10 +88,16 @@ whisper-rs = { version = "0.15", features = ["cuda"] }
 
 **タスク**:
 
-- [ ] whisper-rs 初期化（CUDA 有効）
-- [ ] ggml-large-v3-turbo.bin 読み込み
-- [ ] 日本語指定で推論実行
-- [ ] 結果をフロントエンドへ送信
+- [ ] whisper-rs 初期化（CUDA 有効）- **保留中**
+- [ ] ggml-large-v3-turbo.bin 読み込み - **保留中**
+- [ ] 日本語指定で推論実行 - **保留中**
+- [x] 結果をフロントエンドへ送信
+
+**現在の状況**:
+- Visual Studio 18 の cmake サポート問題により、whisper-rs のビルドが失敗
+- 一時的にダミーモードで動作確認中
+- 基本的な録音・UI 機能は動作可能
+- Whisper 統合は cmake 問題解決後に実装予定
 
 **モデルパス**: `%APPDATA%/voice-input/models/`
 
@@ -97,16 +105,20 @@ whisper-rs = { version = "0.15", features = ["cuda"] }
 
 **タスク**:
 
-- [ ] 認識結果をクリップボードにコピー
-- [ ] オプション: 自動ペースト（SendInput シミュレート）
+- [x] 認識結果をクリップボードにコピー
+- [ ] オプション: 自動ペースト（SendInput シミュレート）- 今後実装予定
+
+**実装済み**: `src-tauri/src/clipboard/mod.rs`
 
 ### 1.6 基本 UI
 
 **タスク**:
 
-- [ ] 録音インジケーター（波形 or アイコン）
-- [ ] 認識結果表示
-- [ ] システムトレイ常駐
+- [x] 録音インジケーター（波形 or アイコン）
+- [x] 認識結果表示
+- [ ] システムトレイ常駐 - 今後実装予定
+
+**実装済み**: `src/routes/+page.svelte`
 
 ---
 
