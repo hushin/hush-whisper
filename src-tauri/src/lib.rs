@@ -320,8 +320,8 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
 
     let clipboard = clipboard_guard.as_mut().unwrap();
     clipboard
-        .set_text(&text)
-        .map_err(|e| format!("Failed to copy to clipboard: {}", e))?;
+        .set_and_paste(&text)
+        .map_err(|e| format!("Failed to paste text: {}", e))?;
 
     // Notify frontend with result
     app.emit("transcription-complete", text.clone())

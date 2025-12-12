@@ -38,6 +38,7 @@ futures-util = "0.3"
 
 # Clipboard
 arboard = "3"
+enigo = "0.2"
 
 # Logging
 tracing = "0.1"

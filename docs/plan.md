@@ -112,7 +112,7 @@ whisper-rs = { version = "0.15", features = ["cuda"] }
 **タスク**:
 
 - [x] 認識結果をクリップボードにコピー
-- [ ] オプション: 自動ペースト（SendInput シミュレート）- 今後実装予定
+- [x] 自動ペースト（enigo で Ctrl+V シミュレート）
 
 **実装済み**: `src-tauri/src/clipboard/mod.rs`
 
