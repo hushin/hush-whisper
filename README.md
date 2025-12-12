@@ -1,10 +1,6 @@
 # VoiceInput
 
-Windows 向けローカル音声入力アプリ（開発中）
-
-## 現在の状況
-
-Phase 1（基本動作）の実装が完了しました。
+Windows 向けローカル音声入力アプリ
 
 ### ✅ 実装済み機能
 
@@ -12,7 +8,7 @@ Phase 1（基本動作）の実装が完了しました。
 - **音声キャプチャ**: cpal でマイク入力取得
 - **リサンプリング**: 48kHz → 16kHz 変換（Whisper 用）
 - **Whisper 音声認識**: whisper-rs による日本語音声認識
-- **クリップボード**: 認識結果の自動コピー
+- **クリップボード**: 認識結果の自動コピー・ペースト
 - **基本 UI**: 録音インジケーター、結果表示
 
 ## セットアップ
@@ -34,17 +30,6 @@ winget install Ninja-build.Ninja
 
 # または scoop
 scoop install ninja
-```
-
-### Whisper モデルのダウンロード
-
-```bash
-# モデルディレクトリを作成
-mkdir -p %APPDATA%\voice-input\models
-
-# Hugging Face からモデルをダウンロード（例: large-v3-turbo）
-# https://huggingface.co/ggerganov/whisper.cpp/tree/main
-# ggml-large-v3-turbo.bin を上記ディレクトリに配置
 ```
 
 ### インストール
@@ -90,12 +75,3 @@ src-tauri/
 src/             # Svelte フロントエンド
 docs/            # 実装計画・詳細
 ```
-
-## 次のステップ (Phase 2)
-
-1. VAD（Voice Activity Detection）の実装
-2. LLM 統合による文章整形
-3. システムトレイ常駐
-4. 設定画面の実装
-
-詳細は `docs/plan.md` を参照してください。
