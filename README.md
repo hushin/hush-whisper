@@ -1,6 +1,6 @@
 # VoiceInput
 
-Windows向けローカル音声入力アプリ（開発中）
+Windows 向けローカル音声入力アプリ（開発中）
 
 ## 現在の状況
 
@@ -10,10 +10,10 @@ Phase 1（基本動作）の実装が完了しました。
 
 - **グローバルショートカット**: Ctrl+Space で録音開始/停止
 - **音声キャプチャ**: cpal でマイク入力取得
-- **リサンプリング**: 48kHz → 16kHz 変換（Whisper用）
-- **Whisper音声認識**: whisper-rs による日本語音声認識
+- **リサンプリング**: 48kHz → 16kHz 変換（Whisper 用）
+- **Whisper 音声認識**: whisper-rs による日本語音声認識
 - **クリップボード**: 認識結果の自動コピー
-- **基本UI**: 録音インジケーター、結果表示
+- **基本 UI**: 録音インジケーター、結果表示
 
 ## セットアップ
 
@@ -66,7 +66,7 @@ pnpm tauri build
 2. Whisper モデルのパスを入力し「モデルを読み込む」をクリック
 3. Ctrl+Space を押して録音開始
 4. もう一度 Ctrl+Space を押して録音停止
-5. 認識結果がクリップボードに自動コピーされます
+5. 認識結果がクリップボードに自動コピーされ、貼り付けされます
 
 ## 技術スタック
 
@@ -94,12 +94,8 @@ docs/            # 実装計画・詳細
 ## 次のステップ (Phase 2)
 
 1. VAD（Voice Activity Detection）の実装
-2. LLM統合による文章整形
+2. LLM 統合による文章整形
 3. システムトレイ常駐
 4. 設定画面の実装
 
 詳細は `docs/plan.md` を参照してください。
-
-## Recommended IDE Setup
-
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).

@@ -1,6 +1,6 @@
 # VoiceInput
 
-Windows向けローカル音声入力アプリ。グローバルショートカットで任意のアプリに日本語音声入力。
+Windows 向けローカル音声入力アプリ。グローバルショートカットで任意のアプリに日本語音声入力。
 
 ## Tech Stack
 
@@ -52,6 +52,7 @@ pnpm lint
 ## Documentation
 
 詳細な実装ガイドは `docs/` 配下を参照:
+
 - `docs/plan.md` - 実装計画とフェーズ
 - `docs/audio-pipeline.md` - 音声処理パイプライン
 - `docs/model-management.md` - モデルダウンロード・管理

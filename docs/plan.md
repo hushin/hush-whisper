@@ -89,19 +89,21 @@ whisper-rs = { version = "0.15", features = ["cuda"] }
 
 **タスク**:
 
-- [x] whisper-rs 初期化（CUDA版）
+- [x] whisper-rs 初期化（CUDA 版）
 - [x] ggml-large-v3-turbo.bin 読み込み
 - [x] 日本語指定で推論実行
 - [x] 結果をフロントエンドへ送信
 
 **実装済み**: `src-tauri/src/whisper/transcribe.rs`
 
-**CUDA対応**:
+**CUDA 対応**:
+
 - whisper-rs の `cuda` feature を有効化
 - WhisperContextParameters で `use_gpu(true)` を設定
 - RTX 4070 Ti (12GB VRAM) で動作確認済み
 
 **ビルド環境設定** (`.cargo/config.toml`):
+
 - `CMAKE_GENERATOR=Ninja`: Visual Studio 18 (2026) は cmake クレートでまだサポートされていないため
 - `CMAKE_CUDA_FLAGS="-allow-unsupported-compiler"`: CUDA 13.0 は VS 2019-2022 のみ公式サポートのため
 
@@ -240,107 +242,8 @@ hf-hub = { version = "0.3", features = ["tokio"] }
 
 ---
 
-## ディレクトリ構造
-
-```
-voice-input/
-├── CLAUDE.md
-├── package.json
-├── pnpm-lock.yaml
-├── svelte.config.js
-├── vite.config.ts
-├── tsconfig.json
-├── src/                          # Frontend
-│   ├── app.html
-│   ├── app.css
-│   ├── lib/
-│   │   ├── components/
-│   │   │   ├── RecordingIndicator.svelte
-│   │   │   ├── TranscriptionView.svelte
-│   │   │   ├── Settings.svelte
-│   │   │   └── ModelDownloader.svelte
-│   │   └── stores/
-│   │       ├── recording.ts
-│   │       └── settings.ts
-│   └── routes/
-│       └── +page.svelte
-├── src-tauri/
-│   ├── Cargo.toml
-│   ├── tauri.conf.json
-│   ├── capabilities/
-│   │   └── default.json
-│   ├── build.rs
-│   └── src/
-│       ├── main.rs
-│       ├── lib.rs
-│       ├── audio/
-│       │   ├── mod.rs
-│       │   ├── capture.rs         # cpal audio input
-│       │   ├── resample.rs        # 48kHz→16kHz
-│       │   └── vad.rs             # Silero VAD
-│       ├── whisper/
-│       │   ├── mod.rs
-│       │   └── transcribe.rs      # whisper-rs wrapper
-│       ├── llm/
-│       │   ├── mod.rs
-│       │   └── refine.rs          # llama-cpp-rs wrapper
-│       ├── shortcuts/
-│       │   ├── mod.rs
-│       │   └── handler.rs         # Global hotkey
-│       ├── models/
-│       │   ├── mod.rs
-│       │   └── download.rs        # hf-hub downloader
-│       ├── clipboard/
-│       │   └── mod.rs             # Clipboard operations
-│       └── log/
-│           ├── mod.rs
-│           └── storage.rs         # Log persistence
-└── docs/
-    ├── plan.md                    # This file
-    ├── audio-pipeline.md
-    └── model-management.md
-```
-
----
-
-## VRAM 使用量見積もり（12GB 環境）
-
-| コンポーネント   | モデル              | VRAM      |
-| ---------------- | ------------------- | --------- |
-| Whisper          | large-v3-turbo FP16 | ~6GB      |
-| Whisper          | large-v3-turbo INT8 | ~3GB      |
-| LLM              | Qwen2.5-7B Q4_K_M   | ~5GB      |
-| Silero VAD       | -                   | ~50MB     |
-| **合計（FP16）** |                     | **~11GB** |
-| **合計（INT8）** |                     | **~8GB**  |
-
----
-
-## レイテンシー目標
-
-| 処理           | 目標              | 実現手段                |
-| -------------- | ----------------- | ----------------------- |
-| 音声キャプチャ | リアルタイム      | cpal 非同期ストリーム   |
-| VAD            | <10ms/チャンク    | Silero ONNX             |
-| Whisper 推論   | <500ms (3 秒音声) | CUDA, large-v3-turbo    |
-| LLM 整形       | <1500ms           | Q4 量子化, 短プロンプト |
-| **合計**       | **<3 秒**         |                         |
-
----
-
 ## 参考リソース
 
-- [Epicenter Whispering](https://github.com/cjpais/epicenter-whispering) - Tauri + transcribe-rs 参考実装
 - [whisper-rs](https://github.com/tazz4843/whisper-rs) - Whisper.cpp バインディング
 - [llama_cpp-rs](https://github.com/edgenai/llama_cpp-rs) - llama.cpp バインディング
 - [Tauri 2.0 Docs](https://v2.tauri.app/) - フレームワークドキュメント
-
----
-
-## マイルストーン
-
-| Phase   | 期間目安 | 成果物                 |
-| ------- | -------- | ---------------------- |
-| Phase 1 | 1-2 週間 | 基本音声入力動作       |
-| Phase 2 | 1-2 週間 | VAD+LLM 統合、ログ機能 |
-| Phase 3 | 1-2 週間 | 最適化、設定 UI 完成   |
