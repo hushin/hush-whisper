@@ -9,14 +9,21 @@
     percentage: number;
   }
 
-  let modelPath = $state("%APPDATA%\\voice-input\\models\\ggml-large-v3-turbo.bin");
+  interface ModelInfo {
+    name: string;
+    filename: string;
+    size_hint: string;
+  }
+
+  let availableModels = $state<ModelInfo[]>([]);
+  let selectedModel = $state("large-v3-turbo-q8_0");
   let isModelInitialized = $state(false);
   let isRecording = $state(false);
   let isTranscribing = $state(false);
   let isDownloading = $state(false);
   let downloadProgress = $state<DownloadProgress | null>(null);
   let transcriptionResult = $state("");
-  let statusMessage = $state("モデルを初期化してください");
+  let statusMessage = $state("モデルを選択して初期化してください");
   let errorMessage = $state("");
 
   function formatBytes(bytes: number): string {
@@ -27,12 +34,20 @@
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   }
 
+  async function loadModels() {
+    try {
+      availableModels = await invoke("get_available_models");
+    } catch (error) {
+      console.error("Failed to load models:", error);
+    }
+  }
+
   async function initializeWhisper() {
     try {
       errorMessage = "";
       statusMessage = "モデルを確認中...";
 
-      await invoke("initialize_whisper", { modelPath });
+      await invoke("initialize_whisper", { modelName: selectedModel });
       isModelInitialized = true;
       isDownloading = false;
       downloadProgress = null;
@@ -58,6 +73,9 @@
   }
 
   onMount(() => {
+    // Load available models
+    loadModels();
+
     // Listen for download events
     const unlistenDownloadStarted = listen("download-started", () => {
       isDownloading = true;
@@ -134,13 +152,17 @@
   <div class="section">
     <h2>モデル設定</h2>
     <div class="model-setup">
-      <input
-        type="text"
-        bind:value={modelPath}
-        placeholder="Whisperモデルのパス"
+      <select
+        bind:value={selectedModel}
         disabled={isModelInitialized || isDownloading}
-        class="model-path-input"
-      />
+        class="model-select"
+      >
+        {#each availableModels as model}
+          <option value={model.name}>
+            {model.name} ({model.size_hint})
+          </option>
+        {/each}
+      </select>
       <button
         onclick={initializeWhisper}
         disabled={isModelInitialized || isDownloading}
@@ -172,7 +194,7 @@
     {/if}
 
     <p class="model-hint">
-      モデルが存在しない場合は自動的にダウンロードされます（約1.5GB）
+      モデルが存在しない場合は自動的にダウンロードされます
     </p>
   </div>
 
@@ -274,23 +296,25 @@
     align-items: center;
   }
 
-  .model-path-input {
+  .model-select {
     flex: 1;
     padding: 0.75rem;
     border: 2px solid #ddd;
     border-radius: 8px;
     font-size: 0.9rem;
-    font-family: "Consolas", monospace;
+    background-color: white;
+    cursor: pointer;
   }
 
-  .model-path-input:focus {
+  .model-select:focus {
     outline: none;
     border-color: #396cd8;
   }
 
-  .model-path-input:disabled {
+  .model-select:disabled {
     background-color: #f0f0f0;
     color: #999;
+    cursor: not-allowed;
   }
 
   .model-hint {
@@ -465,13 +489,13 @@
       color: #aaa;
     }
 
-    .model-path-input {
+    .model-select {
       background-color: #1a1a1a;
       color: #f6f6f6;
       border-color: #444;
     }
 
-    .model-path-input:disabled {
+    .model-select:disabled {
       background-color: #333;
       color: #666;
     }

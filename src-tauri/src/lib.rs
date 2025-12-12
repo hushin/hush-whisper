@@ -14,7 +14,23 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Listener, Manager, State};
 use tokio::io::AsyncWriteExt;
 
-const MODEL_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin";
+/// Available Whisper models with their URLs and filenames
+const MODELS: &[(&str, &str, &str)] = &[
+    ("large-v3-turbo-q8_0", "ggml-large-v3-turbo-q8_0.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q8_0.bin"),
+    ("large-v3-turbo", "ggml-large-v3-turbo.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin"),
+    ("medium", "ggml-medium.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin"),
+    ("small", "ggml-small.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"),
+    ("base", "ggml-base.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"),
+    ("tiny", "ggml-tiny.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"),
+];
+
+fn get_model_url(model_name: &str) -> Option<&'static str> {
+    MODELS.iter().find(|(name, _, _)| *name == model_name).map(|(_, _, url)| *url)
+}
+
+fn get_model_filename(model_name: &str) -> Option<&'static str> {
+    MODELS.iter().find(|(name, _, _)| *name == model_name).map(|(_, filename, _)| *filename)
+}
 
 /// Expand Windows environment variables like %APPDATA%
 fn expand_env_vars(path: &str) -> String {
@@ -72,29 +88,39 @@ struct DownloadProgress {
     percentage: f64,
 }
 
+#[derive(Clone, serde::Serialize)]
+struct ModelInfo {
+    name: String,
+    filename: String,
+    size_hint: String,
+}
+
 #[tauri::command]
-async fn download_model(app: AppHandle, model_path: String) -> Result<String, String> {
-    let expanded_path = expand_env_vars(&model_path);
-    let path = PathBuf::from(&expanded_path);
+fn get_available_models() -> Vec<ModelInfo> {
+    vec![
+        ModelInfo { name: "large-v3-turbo-q8_0".into(), filename: "ggml-large-v3-turbo-q8_0.bin".into(), size_hint: "~820MB (推奨)".into() },
+        ModelInfo { name: "large-v3-turbo".into(), filename: "ggml-large-v3-turbo.bin".into(), size_hint: "~1.5GB".into() },
+        ModelInfo { name: "medium".into(), filename: "ggml-medium.bin".into(), size_hint: "~1.5GB".into() },
+        ModelInfo { name: "small".into(), filename: "ggml-small.bin".into(), size_hint: "~500MB".into() },
+        ModelInfo { name: "base".into(), filename: "ggml-base.bin".into(), size_hint: "~150MB".into() },
+        ModelInfo { name: "tiny".into(), filename: "ggml-tiny.bin".into(), size_hint: "~77MB".into() },
+    ]
+}
 
-    // Check if already exists
-    if path.exists() {
-        return Ok("Model already exists".to_string());
-    }
-
+async fn download_model_internal(app: &AppHandle, model_url: &str, target_path: &PathBuf) -> Result<(), String> {
     // Create parent directory if needed
-    if let Some(parent) = path.parent() {
+    if let Some(parent) = target_path.parent() {
         tokio::fs::create_dir_all(parent)
             .await
             .map_err(|e| format!("Failed to create directory: {}", e))?;
     }
 
-    tracing::info!("Downloading model from {} to {}", MODEL_URL, expanded_path);
+    tracing::info!("Downloading model from {} to {:?}", model_url, target_path);
 
     // Start download
     let client = reqwest::Client::new();
     let response = client
-        .get(MODEL_URL)
+        .get(model_url)
         .send()
         .await
         .map_err(|e| format!("Failed to start download: {}", e))?;
@@ -103,7 +129,7 @@ async fn download_model(app: AppHandle, model_path: String) -> Result<String, St
     tracing::info!("Total size: {} bytes", total_size);
 
     // Create temp file
-    let temp_path = path.with_extension("bin.tmp");
+    let temp_path = target_path.with_extension("bin.tmp");
     let mut file = tokio::fs::File::create(&temp_path)
         .await
         .map_err(|e| format!("Failed to create file: {}", e))?;
@@ -137,27 +163,33 @@ async fn download_model(app: AppHandle, model_path: String) -> Result<String, St
     }
 
     // Rename temp file to final path
-    tokio::fs::rename(&temp_path, &path)
+    tokio::fs::rename(&temp_path, target_path)
         .await
         .map_err(|e| format!("Failed to finalize download: {}", e))?;
 
-    tracing::info!("Download complete: {}", expanded_path);
-    Ok("Download complete".to_string())
+    tracing::info!("Download complete: {:?}", target_path);
+    Ok(())
 }
 
 #[tauri::command]
 async fn initialize_whisper(
     state: State<'_, AppState>,
     app: AppHandle,
-    model_path: String,
+    model_name: String,
 ) -> Result<String, String> {
-    tracing::info!("Initializing Whisper with model: {}", model_path);
+    tracing::info!("Initializing Whisper with model: {}", model_name);
 
-    // Expand environment variables like %APPDATA%
-    let expanded_path = expand_env_vars(&model_path);
-    tracing::info!("Expanded path: {}", expanded_path);
+    // Get model info
+    let model_url = get_model_url(&model_name)
+        .ok_or_else(|| format!("Unknown model: {}", model_name))?;
+    let model_filename = get_model_filename(&model_name)
+        .ok_or_else(|| format!("Unknown model: {}", model_name))?;
 
-    let path = PathBuf::from(&expanded_path);
+    // Construct model path: %APPDATA%/voice-input/models/<filename>
+    let base_path = expand_env_vars("%APPDATA%\\voice-input\\models");
+    let path = PathBuf::from(&base_path).join(model_filename);
+
+    tracing::info!("Model path: {:?}", path);
 
     // If model doesn't exist, download it
     if !path.exists() {
@@ -165,7 +197,7 @@ async fn initialize_whisper(
         app.emit("download-started", ())
             .map_err(|e| format!("Failed to emit event: {}", e))?;
 
-        download_model(app.clone(), model_path.clone()).await?;
+        download_model_internal(&app, model_url, &path).await?;
 
         app.emit("download-complete", ())
             .map_err(|e| format!("Failed to emit event: {}", e))?;
@@ -348,8 +380,8 @@ pub fn run() {
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
             greet,
+            get_available_models,
             initialize_whisper,
-            download_model,
             start_recording,
             stop_recording,
             toggle_recording,

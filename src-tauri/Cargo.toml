@@ -29,7 +29,8 @@ tokio = { version = "1", features = ["full"] }
 cpal = "0.15"
 rubato = "0.16"
 
-# Whisper (Phase 1)
+# Whisper (Phase 1) - CPU mode with optimization
+# Note: GPU acceleration (cuda/vulkan) requires additional SDK setup
 whisper-rs = "0.15"
 
 # Model download
