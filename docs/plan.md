@@ -56,8 +56,9 @@ serde_json = "1"
 # Audio
 cpal = "0.15"
 
-# Whisper (Phase 1)
+# Whisper (Phase 1) - CUDA enabled
 whisper-rs = { version = "0.15", features = ["cuda"] }
+# Note: Requires CMAKE_GENERATOR=Ninja and CMAKE_CUDA_FLAGS="-allow-unsupported-compiler" for VS 18
 ```
 
 ### 1.2 グローバルショートカット
@@ -88,17 +89,21 @@ whisper-rs = { version = "0.15", features = ["cuda"] }
 
 **タスク**:
 
-- [x] whisper-rs 初期化（CPU版）
+- [x] whisper-rs 初期化（CUDA版）
 - [x] ggml-large-v3-turbo.bin 読み込み
 - [x] 日本語指定で推論実行
 - [x] 結果をフロントエンドへ送信
 
 **実装済み**: `src-tauri/src/whisper/transcribe.rs`
 
-**cmake問題の解決策**:
-- Visual Studio 18 (2026) は cmake クレートでまだサポートされていない
-- 解決策: CMAKE_GENERATOR=Ninja を使用
-- `.cargo/config.toml` に設定を追加済み
+**CUDA対応**:
+- whisper-rs の `cuda` feature を有効化
+- WhisperContextParameters で `use_gpu(true)` を設定
+- RTX 4070 Ti (12GB VRAM) で動作確認済み
+
+**ビルド環境設定** (`.cargo/config.toml`):
+- `CMAKE_GENERATOR=Ninja`: Visual Studio 18 (2026) は cmake クレートでまだサポートされていないため
+- `CMAKE_CUDA_FLAGS="-allow-unsupported-compiler"`: CUDA 13.0 は VS 2019-2022 のみ公式サポートのため
 
 **モデルパス**: `%APPDATA%/voice-input/models/`
 

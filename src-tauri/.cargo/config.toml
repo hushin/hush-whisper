@@ -1,4 +1,6 @@
 # Configuration for building whisper-rs on Windows
 # Uses Ninja generator to avoid Visual Studio version compatibility issues
+# CMAKE_CUDA_FLAGS allows VS 18 (2026) which is not officially supported by CUDA 13.0
 [env]
 CMAKE_GENERATOR = "Ninja"
+CMAKE_CUDA_FLAGS = "-allow-unsupported-compiler"

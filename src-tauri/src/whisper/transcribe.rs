@@ -9,10 +9,16 @@ impl WhisperTranscriber {
     pub fn new(model_path: PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
         tracing::info!("Loading Whisper model from: {:?}", model_path);
 
-        let params = WhisperContextParameters::default();
+        let mut params = WhisperContextParameters::default();
+        // Explicitly enable GPU (CUDA) if available
+        params.use_gpu(true);
+        params.gpu_device(0);
+
+        tracing::info!("GPU acceleration enabled: use_gpu=true, device=0");
+
         let ctx = WhisperContext::new_with_params(&model_path.to_string_lossy(), params)?;
 
-        tracing::info!("Whisper model loaded successfully");
+        tracing::info!("Whisper model loaded successfully (CUDA enabled)");
 
         Ok(Self { ctx })
     }
