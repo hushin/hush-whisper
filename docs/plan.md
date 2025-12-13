@@ -57,19 +57,19 @@ Phase 1 の全機能が実装完了しました。詳細は [`docs/done.md`](./d
 
 **目標**: VAD でハルシネーション抑制、LLM で文章整形
 
-### 3.1 Silero VAD 統合
+### 3.1 Silero VAD 統合 ✅ 完了
 
 **タスク**:
 
-- [ ] voice_activity_detector クレート追加
-- [ ] 発話区間のみ Whisper へ送信
-- [ ] 無音時の誤認識（「ご視聴ありがとう」等）防止
+- [x] voice_activity_detector クレート追加
+- [x] 発話区間のみ Whisper へ送信
+- [x] 無音時の誤認識（「ご視聴ありがとう」等）防止
 
-**追加依存**:
+**実装**:
 
-```toml
-voice_activity_detector = "0.2"
-```
+- `src-tauri/src/audio/vad.rs` - VAD 処理モジュール
+- Silero VAD V5 モデルで発話区間を検出
+- 512 サンプル (32ms) ごとに判定、パディング付き
 
 ### 3.2 LLM 後処理
 

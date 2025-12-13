@@ -5,17 +5,6 @@
 現在の音声処理フローは以下の通り：
 
 ```
-┌─────────────┐    ┌──────────────┐    ┌─────────────┐
-│ Microphone  │───▶│  Resample    │───▶│  whisper-rs │
-│   (cpal)    │    │ 48k→16k mono │    │   (CUDA)    │
-└─────────────┘    └──────────────┘    └─────────────┘
-     任意Hz             16kHz           transcription
-  stereo/mono          mono
-```
-
-将来的には Silero VAD を統合して音声区間検出を行う予定：
-
-```
 ┌─────────────┐    ┌──────────────┐    ┌───────────┐    ┌─────────────┐
 │ Microphone  │───▶│  Resample    │───▶│  Silero   │───▶│  whisper-rs │
 │   (cpal)    │    │ 48k→16k mono │    │    VAD    │    │   (CUDA)    │
@@ -111,17 +100,36 @@ let output = resampler.resample(&input, 48000)?; // 48kHz から変換
 
 ---
 
-## 3. Voice Activity Detection (VAD) - Phase 2 で実装予定
+## 3. Voice Activity Detection (VAD)
 
 無音区間を除去して Whisper への入力を最適化。ハルシネーション防止にも効果的。
 
-### 計画
+### 実装概要
 
-- **ライブラリ**: `voice_activity_detector` クレート
-- **モデル**: Silero VAD
+**ファイル**: `src-tauri/src/audio/vad.rs`
+
+- **ライブラリ**: `voice_activity_detector` クレート (v0.2)
+- **モデル**: Silero VAD V5
 - **処理**: 発話区間のみを Whisper に送信
 
-### 期待される効果
+### パラメータ
+
+| パラメータ       | 値    | 説明                                |
+| ---------------- | ----- | ----------------------------------- |
+| sample_rate      | 16000 | 入力サンプルレート                  |
+| chunk_size       | 512   | 処理チャンクサイズ (32ms)           |
+| threshold        | 0.5   | 発話判定閾値                        |
+| padding_chunks   | 3     | 発話前後のパディング (~96ms)        |
+
+### 処理フロー
+
+1. 16kHz にリサンプリングされた音声を 512 サンプルごとに分割
+2. 各チャンクの発話確率を Silero VAD で推定
+3. 確率 > 0.5 のチャンクを Speech として抽出
+4. 80% 以上が発話の場合は元音声をそのまま使用（品質保持）
+5. 発話が検出されない場合は空配列を返す（ハルシネーション防止）
+
+### 効果
 
 1. **ハルシネーション防止**
 
@@ -157,6 +165,7 @@ let output = resampler.resample(&input, 48000)?; // 48kHz から変換
 
 - `src-tauri/src/audio/capture.rs` - 音声キャプチャ
 - `src-tauri/src/audio/resample.rs` - リサンプリング
+- `src-tauri/src/audio/vad.rs` - Voice Activity Detection
 - `src-tauri/src/audio/mod.rs` - モジュール定義
 - `src-tauri/src/whisper/transcribe.rs` - Whisper 推論
 
@@ -166,4 +175,5 @@ let output = resampler.resample(&input, 48000)?; // 48kHz から変換
 
 - [cpal Documentation](https://docs.rs/cpal/) - クロスプラットフォーム音声 I/O
 - [rubato Documentation](https://docs.rs/rubato/) - 高品質リサンプリング
-- [Silero VAD](https://github.com/snakers4/silero-vad) - 音声活動検出（今後統合予定）
+- [voice_activity_detector](https://docs.rs/voice_activity_detector/) - Silero VAD V5 Rust バインディング
+- [Silero VAD](https://github.com/snakers4/silero-vad) - 音声活動検出モデル

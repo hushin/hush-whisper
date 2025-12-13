@@ -5,7 +5,7 @@ mod shortcuts;
 mod tray;
 mod whisper;
 
-use audio::{AudioCapture, Resampler};
+use audio::{AudioCapture, Resampler, VadProcessor};
 use clipboard::ClipboardManager;
 use shortcuts::ShortcutHandler;
 use tray::TrayManager;
@@ -64,6 +64,7 @@ pub struct AppState {
     active_stream: Mutex<Option<Box<cpal::Stream>>>,
     whisper: Mutex<Option<WhisperTranscriber>>,
     clipboard: Mutex<Option<ClipboardManager>>,
+    vad: Mutex<Option<VadProcessor>>,
     is_recording: Mutex<bool>,
 }
 
@@ -79,6 +80,7 @@ impl AppState {
             active_stream: Mutex::new(None),
             whisper: Mutex::new(None),
             clipboard: Mutex::new(None),
+            vad: Mutex::new(None),
             is_recording: Mutex::new(false),
         }
     }
@@ -292,6 +294,30 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
 
     tracing::info!("Resampled to {} samples", resampled_data.len());
 
+    // Apply VAD to extract speech segments
+    let mut vad_guard = state.vad.lock().unwrap();
+    if vad_guard.is_none() {
+        match VadProcessor::new() {
+            Ok(vad) => *vad_guard = Some(vad),
+            Err(e) => tracing::warn!("Failed to create VAD, skipping: {}", e),
+        }
+    }
+
+    let speech_data = if let Some(vad) = vad_guard.as_mut() {
+        let extracted = vad.extract_speech(&resampled_data);
+        if extracted.is_empty() {
+            tracing::info!("VAD detected no speech, using original audio");
+            resampled_data
+        } else {
+            extracted
+        }
+    } else {
+        resampled_data
+    };
+    drop(vad_guard);
+
+    tracing::info!("After VAD: {} samples", speech_data.len());
+
     // Transcribe
     app.emit("transcription-started", ())
         .map_err(|e| format!("Failed to emit event: {}", e))?;
@@ -300,14 +326,14 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
     let text = if let Some(whisper) = whisper_guard.as_ref() {
         // Use Whisper for transcription
         whisper
-            .transcribe(&resampled_data)
+            .transcribe(&speech_data)
             .map_err(|e| format!("Failed to transcribe: {}", e))?
     } else {
         // Fallback to dummy mode if Whisper not initialized
         tracing::warn!("Whisper not initialized, using dummy mode");
         format!(
             "[デモモード] {}サンプルの音声を録音しました。モデルを読み込んでください。",
-            resampled_data.len()
+            speech_data.len()
         )
     };
 

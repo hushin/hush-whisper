@@ -28,6 +28,7 @@ tokio = { version = "1", features = ["full"] }
 # Audio
 cpal = "0.15"
 rubato = "0.16"
+voice_activity_detector = "0.2"
 
 # Whisper (Phase 1) - CUDA enabled for GPU acceleration
 whisper-rs = { version = "0.15", features = ["cuda"] }
