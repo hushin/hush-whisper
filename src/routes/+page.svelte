@@ -15,8 +15,17 @@
     size_hint: string;
   }
 
+  interface WhisperSettings {
+    model_name: string;
+  }
+
+  interface Settings {
+    whisper: WhisperSettings;
+    is_saved: boolean;
+  }
+
   let availableModels = $state<ModelInfo[]>([]);
-  let selectedModel = $state("large-v3-turbo-q8_0");
+  let selectedModel = $state("large-v3-turbo");
   let isModelInitialized = $state(false);
   let isRecording = $state(false);
   let isTranscribing = $state(false);
@@ -42,6 +51,27 @@
     }
   }
 
+  async function loadSettings(): Promise<boolean> {
+    try {
+      const settings: Settings = await invoke("get_settings");
+      selectedModel = settings.whisper.model_name;
+      console.log("Loaded settings, model:", selectedModel, "is_saved:", settings.is_saved);
+      return settings.is_saved;
+    } catch (error) {
+      console.error("Failed to load settings:", error);
+      return false;
+    }
+  }
+
+  async function saveModelSelection(modelName: string) {
+    try {
+      await invoke("save_model_selection", { modelName });
+      console.log("Saved model selection:", modelName);
+    } catch (error) {
+      console.error("Failed to save model selection:", error);
+    }
+  }
+
   async function initializeWhisper() {
     try {
       errorMessage = "";
@@ -52,6 +82,9 @@
       isDownloading = false;
       downloadProgress = null;
       statusMessage = "準備完了 - Ctrl+Space で録音開始/停止";
+
+      // Save the selected model for next time
+      await saveModelSelection(selectedModel);
     } catch (error) {
       errorMessage = `モデル初期化エラー: ${error}`;
       statusMessage = "エラー";
@@ -73,8 +106,15 @@
   }
 
   onMount(() => {
-    // Load available models
-    loadModels();
+    // Load available models first, then settings, then auto-initialize if saved
+    (async () => {
+      await loadModels();
+      const hasSavedSettings = await loadSettings();
+      if (hasSavedSettings) {
+        console.log("Auto-initializing saved model:", selectedModel);
+        await initializeWhisper();
+      }
+    })();
 
     // Listen for download events
     const unlistenDownloadStarted = listen("download-started", () => {

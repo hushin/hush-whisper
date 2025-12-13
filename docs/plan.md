@@ -34,22 +34,21 @@ Phase 1 の全機能が実装完了しました。詳細は [`docs/done.md`](./d
 - [x] トレイメニュー（ウィンドウを表示、終了）
 - [x] 左クリックでウィンドウ表示
 
-### 2.2 モデル選択の永続化
+### 2.2 モデル選択の永続化 ✅ 完了
 
 **タスク**:
 
-- [ ] デフォルトモデルを ggml-large-v3-turbo.bin に変更
-- [ ] ユーザーが選択したモデルを設定ファイルに保存
-- [ ] 次回起動時に前回選択したモデルを自動ロード
-- [ ] 設定 UI でモデル選択を保存
+- [x] デフォルトモデルを ggml-large-v3-turbo.bin に変更
+- [x] ユーザーが選択したモデルを設定ファイルに保存
+- [x] 次回起動時に前回選択したモデルを自動ロード
+- [x] 設定 UI でモデル選択を保存
 
-**実装方針**:
+**実装**:
 
-```toml
-# 設定ファイル例 (config.toml)
-[whisper]
-model_path = "models/ggml-large-v3-turbo.bin"
-```
+- 設定ファイル: `%APPDATA%/voice-input/config.json`
+- Rust側: `src-tauri/src/config/mod.rs` で設定の読み書き
+- Tauriコマンド: `get_settings`, `save_model_selection`
+- フロントエンド: 起動時に設定読み込み、モデル初期化時に保存
 
 ---
 

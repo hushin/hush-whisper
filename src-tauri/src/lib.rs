@@ -1,5 +1,6 @@
 mod audio;
 mod clipboard;
+mod config;
 mod shortcuts;
 mod tray;
 mod whisper;
@@ -348,6 +349,18 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+#[tauri::command]
+fn get_settings() -> config::Settings {
+    config::load_settings()
+}
+
+#[tauri::command]
+fn save_model_selection(model_name: String) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.whisper.model_name = model_name;
+    config::save_settings(&settings)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize tracing
@@ -392,6 +405,8 @@ pub fn run() {
             start_recording,
             stop_recording,
             toggle_recording,
+            get_settings,
+            save_model_selection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
