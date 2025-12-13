@@ -19,10 +19,10 @@ impl ClipboardManager {
         Ok(())
     }
 
-    pub fn get_text(&mut self) -> Result<String, Box<dyn std::error::Error>> {
-        let text = self.clipboard.get_text()?;
-        Ok(text)
-    }
+    // pub fn get_text(&mut self) -> Result<String, Box<dyn std::error::Error>> {
+    //     let text = self.clipboard.get_text()?;
+    //     Ok(text)
+    // }
 
     /// Simulate Shift+Insert to paste clipboard contents
     /// Using Shift+Insert instead of Ctrl+V to avoid AHK hook interception
