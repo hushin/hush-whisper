@@ -1,17 +1,19 @@
 mod audio;
 mod clipboard;
 mod shortcuts;
+mod tray;
 mod whisper;
 
 use audio::{AudioCapture, Resampler};
 use clipboard::ClipboardManager;
 use shortcuts::ShortcutHandler;
+use tray::TrayManager;
 use whisper::WhisperTranscriber;
 
 use futures_util::StreamExt;
 use std::path::PathBuf;
-use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Listener, Manager, State};
+use std::sync::{Arc, Mutex};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::io::AsyncWriteExt;
 
 /// Available Whisper models with their URLs and filenames
@@ -357,23 +359,28 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
-            // Register global shortcut
-            if let Err(e) = ShortcutHandler::register(app.handle()) {
-                tracing::error!("Failed to register global shortcut: {}", e);
-            }
-
-            // Listen to recording-toggle event from shortcut
-            let app_handle = app.handle().clone();
-            let _ = app.listen("recording-toggle", move |_event| {
+            // Create toggle callback
+            let toggle_callback = Arc::new(|app_handle: &AppHandle| {
                 let app_clone = app_handle.clone();
-
-                tauri::async_runtime::block_on(async move {
+                tauri::async_runtime::spawn(async move {
                     let state: State<AppState> = app_clone.state();
                     if let Err(e) = toggle_recording(state, app_clone.clone()).await {
                         tracing::error!("Failed to toggle recording: {}", e);
                     }
                 });
             });
+
+            // Register global shortcut with callback
+            if let Err(e) = ShortcutHandler::register(app.handle(), toggle_callback) {
+                tracing::error!("Failed to register global shortcut: {}", e);
+            }
+
+            // Setup system tray
+            let tray_manager = TrayManager::new();
+            if let Err(e) = tray_manager.setup(app.handle()) {
+                tracing::error!("Failed to setup system tray: {}", e);
+            }
+            tracing::info!("Setup complete - tray and shortcuts registered");
 
             Ok(())
         })
