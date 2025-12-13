@@ -47,6 +47,9 @@ impl WhisperTranscriber {
             if let Some(segment) = state.get_segment(i) {
                 // Use to_str_lossy to handle any encoding issues gracefully
                 if let Ok(text) = segment.to_str_lossy() {
+                    if !result.is_empty() {
+                        result.push('\n');
+                    }
                     result.push_str(&text);
                 }
             }
