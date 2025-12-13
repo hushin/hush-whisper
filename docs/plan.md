@@ -21,11 +21,50 @@ Phase 1 の全機能が実装完了しました。詳細は [`docs/done.md`](./d
 
 ---
 
-## Phase 2: 精度向上・LLM 統合
+## Phase 2: UX 改善（優先）
+
+**目標**: 使い勝手を向上させ、フィードバックを可視化
+
+### 2.1 システムトレイ・状態表示
+
+**タスク**:
+
+- [ ] システムトレイアイコン常駐
+- [ ] 録音中は赤い丸を表示（視覚的フィードバック）
+- [ ] トレイメニュー（設定、終了など）
+- [ ] バックグラウンド動作最適化
+
+### 2.2 Push to Talk モード
+
+**タスク**:
+
+- [ ] Alt+` 押下中のみ録音するモード追加
+  - 既存のトグルモード（Ctrl+Space）と共存させる
+
+### 2.3 モデル選択の永続化
+
+**タスク**:
+
+- [ ] デフォルトモデルを ggml-large-v3-turbo.bin に変更
+- [ ] ユーザーが選択したモデルを設定ファイルに保存
+- [ ] 次回起動時に前回選択したモデルを自動ロード
+- [ ] 設定 UI でモデル選択を保存
+
+**実装方針**:
+
+```toml
+# 設定ファイル例 (config.toml)
+[whisper]
+model_path = "models/ggml-large-v3-turbo.bin"
+```
+
+---
+
+## Phase 3: 精度向上・LLM 統合
 
 **目標**: VAD でハルシネーション抑制、LLM で文章整形
 
-### 2.1 Silero VAD 統合
+### 3.1 Silero VAD 統合
 
 **タスク**:
 
@@ -39,7 +78,7 @@ Phase 1 の全機能が実装完了しました。詳細は [`docs/done.md`](./d
 voice_activity_detector = "0.2"
 ```
 
-### 2.2 LLM 後処理
+### 3.2 LLM 後処理
 
 **タスク**:
 
@@ -65,7 +104,7 @@ llama_cpp = { git = "https://github.com/edgenai/llama_cpp-rs.git", features = ["
 出力:
 ```
 
-### 2.3 カスタムプロンプト
+### 3.3 カスタムプロンプト
 
 **タスク**:
 
@@ -73,7 +112,7 @@ llama_cpp = { git = "https://github.com/edgenai/llama_cpp-rs.git", features = ["
 - [ ] プリセット（議事録、メモ、チャット等）
 - [ ] コンテキスト入力（直前の文章など）
 
-### 2.4 ログ機能
+### 3.4 ログ機能
 
 **タスク**:
 
@@ -83,11 +122,11 @@ llama_cpp = { git = "https://github.com/edgenai/llama_cpp-rs.git", features = ["
 
 ---
 
-## Phase 3: 最適化・UX 改善
+## Phase 4: 最適化・高度な機能
 
-**目標**: レイテンシー最適化、使い勝手向上
+**目標**: レイテンシー最適化、モデル管理強化
 
-### 3.1 ストリーミング認識
+### 4.1 ストリーミング認識
 
 **タスク**:
 
@@ -95,7 +134,7 @@ llama_cpp = { git = "https://github.com/edgenai/llama_cpp-rs.git", features = ["
 - [ ] 中間結果のリアルタイム表示
 - [ ] 確定結果の差分更新
 
-### 3.2 VRAM 最適化
+### 4.2 VRAM 最適化
 
 **タスク**:
 
@@ -103,7 +142,7 @@ llama_cpp = { git = "https://github.com/edgenai/llama_cpp-rs.git", features = ["
 - [ ] INT8 量子化オプション
 - [ ] 使用 VRAM モニタリング
 
-### 3.3 モデル管理 UI
+### 4.3 モデル管理 UI
 
 **タスク**:
 
@@ -117,7 +156,7 @@ llama_cpp = { git = "https://github.com/edgenai/llama_cpp-rs.git", features = ["
 hf-hub = { version = "0.3", features = ["tokio"] }
 ```
 
-### 3.4 設定項目
+### 4.4 設定項目
 
 - [ ] ショートカットキーカスタマイズ
 - [ ] 出力先選択（クリップボード/直接入力/ファイル）
@@ -125,11 +164,9 @@ hf-hub = { version = "0.3", features = ["tokio"] }
 - [ ] LLM 有効/無効切り替え
 - [ ] 最大録音時間
 
-### 3.5 自動起動・常駐
+### 4.5 Windows スタートアップ登録
 
-- [ ] Windows スタートアップ登録
-- [ ] システムトレイメニュー
-- [ ] バックグラウンド動作最適化
+- [ ] Windows スタートアップ登録（自動起動）
 
 ---
 
