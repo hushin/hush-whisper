@@ -14,7 +14,7 @@ use whisper::WhisperTranscriber;
 use futures_util::StreamExt;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tokio::io::AsyncWriteExt;
 
 /// Available Whisper models with their URLs and filenames
@@ -396,6 +396,14 @@ pub fn run() {
             tracing::info!("Setup complete - tray and shortcuts registered");
 
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                // Prevent closing the window, hide it instead
+                api.prevent_close();
+                let _ = window.hide();
+                tracing::info!("Window hidden to system tray");
+            }
         })
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
