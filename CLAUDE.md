@@ -53,6 +53,8 @@ pnpm lint
 
 詳細な実装ガイドは `docs/` 配下を参照:
 
-- `docs/plan.md` - 実装計画とフェーズ
-- `docs/audio-pipeline.md` - 音声処理パイプライン
-- `docs/model-management.md` - モデルダウンロード・管理
+- `docs/plan.md` - 実装計画とフェーズ（Phase 2 以降）
+- `docs/done.md` - 実装済み機能（Phase 1 完了）
+- `docs/tech-stack.md` - 技術スタックと選定理由
+- `docs/audio-pipeline.md` - 音声処理パイプライン（実装済み + 今後の計画）
+- `docs/model-management.md` - モデルダウンロード・管理（Phase 2 で実装予定）

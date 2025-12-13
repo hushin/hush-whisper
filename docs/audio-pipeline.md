@@ -2,336 +2,168 @@
 
 ## 概要
 
+現在の音声処理フローは以下の通り：
+
+```
+┌─────────────┐    ┌──────────────┐    ┌─────────────┐
+│ Microphone  │───▶│  Resample    │───▶│  whisper-rs │
+│   (cpal)    │    │ 48k→16k mono │    │   (CUDA)    │
+└─────────────┘    └──────────────┘    └─────────────┘
+     任意Hz             16kHz           transcription
+  stereo/mono          mono
+```
+
+将来的には Silero VAD を統合して音声区間検出を行う予定：
+
 ```
 ┌─────────────┐    ┌──────────────┐    ┌───────────┐    ┌─────────────┐
 │ Microphone  │───▶│  Resample    │───▶│  Silero   │───▶│  whisper-rs │
 │   (cpal)    │    │ 48k→16k mono │    │    VAD    │    │   (CUDA)    │
 └─────────────┘    └──────────────┘    └───────────┘    └─────────────┘
-     48kHz              16kHz            speech           transcription
-     stereo             mono             chunks
+     任意Hz             16kHz            speech           transcription
+  stereo/mono          mono             chunks
 ```
+
+---
 
 ## 1. 音声キャプチャ (cpal)
 
-### デバイス選択
+### 実装概要
+
+**ファイル**: `src-tauri/src/audio/capture.rs`
+
+cpal を使用してマイク入力を取得。以下の機能を実装：
+
+- デフォルト入力デバイスの自動選択
+- 複数のサンプルフォーマットに対応（F32, I16, U16）
+- Stereo → Mono 変換（各チャンネルの平均）
+- バッファリング
+
+### 設計のポイント
+
+1. **サンプルフォーマットの正規化**
+
+   - すべての入力を f32 に変換して処理を統一
+   - デバイス依存の差異を吸収
+
+2. **Mono 変換**
+
+   - Whisper は mono 音声を要求
+   - Stereo の場合は各フレームの平均値を計算
+
+3. **エラーハンドリング**
+   - デバイスが見つからない場合のエラー処理
+   - ストリームエラーのロギング
+
+### 使用例
 
 ```rust
-use cpal::traits::{DeviceTrait, HostTrait};
+let capture = AudioCapture::new()?;
+let stream = capture.start_recording()?;
 
-pub fn get_default_input_device() -> Result<cpal::Device, AudioError> {
-    let host = cpal::default_host();
-    host.default_input_device()
-        .ok_or(AudioError::NoInputDevice)
-}
+// ... 録音中 ...
 
-pub fn list_input_devices() -> Vec<String> {
-    let host = cpal::default_host();
-    host.input_devices()
-        .map(|devices| {
-            devices
-                .filter_map(|d| d.name().ok())
-                .collect()
-        })
-        .unwrap_or_default()
-}
+drop(stream); // ストリームを停止
+let samples = capture.stop_recording(); // バッファを取得
 ```
 
-### ストリーム設定
-
-```rust
-use cpal::{SampleFormat, StreamConfig};
-
-pub fn create_input_stream(
-    device: &cpal::Device,
-    tx: std::sync::mpsc::Sender<Vec<f32>>,
-) -> Result<cpal::Stream, AudioError> {
-    let config = device.default_input_config()?;
-    
-    // 多くのデバイスは48kHz stereo
-    let stream_config = StreamConfig {
-        channels: config.channels(),
-        sample_rate: config.sample_rate(),
-        buffer_size: cpal::BufferSize::Fixed(1024),
-    };
-
-    let stream = match config.sample_format() {
-        SampleFormat::F32 => device.build_input_stream(
-            &stream_config,
-            move |data: &[f32], _| {
-                tx.send(data.to_vec()).ok();
-            },
-            |err| eprintln!("Stream error: {}", err),
-            None,
-        )?,
-        SampleFormat::I16 => device.build_input_stream(
-            &stream_config,
-            move |data: &[i16], _| {
-                let floats: Vec<f32> = data.iter()
-                    .map(|&s| s as f32 / i16::MAX as f32)
-                    .collect();
-                tx.send(floats).ok();
-            },
-            |err| eprintln!("Stream error: {}", err),
-            None,
-        )?,
-        _ => return Err(AudioError::UnsupportedFormat),
-    };
-
-    Ok(stream)
-}
-```
+---
 
 ## 2. リサンプリング (rubato)
 
-Whisperは**16kHz mono f32**を要求。一般的なマイクは48kHz stereoなので変換が必要。
+### 実装概要
 
-### Stereo→Mono変換
+**ファイル**: `src-tauri/src/audio/resample.rs`
 
-```rust
-pub fn stereo_to_mono(stereo: &[f32]) -> Vec<f32> {
-    stereo
-        .chunks_exact(2)
-        .map(|pair| (pair[0] + pair[1]) / 2.0)
-        .collect()
-}
-```
+Whisper は **16kHz mono f32** を要求するため、一般的なマイク（48kHz など）の出力をリサンプリング。
 
-### リサンプリング (48kHz→16kHz)
+### 設計のポイント
 
-```rust
-use rubato::{FftFixedIn, Resampler};
+1. **高品質リサンプリング**
 
-pub struct AudioResampler {
-    resampler: FftFixedIn<f32>,
-    input_buffer: Vec<Vec<f32>>,
-}
+   - `SincFixedIn` を使用（Sinc 補間）
+   - BlackmanHarris2 ウィンドウ関数で高品質な変換
 
-impl AudioResampler {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        // 48000 → 16000 = 1/3
-        let resampler = FftFixedIn::<f32>::new(
-            48000,  // input sample rate
-            16000,  // output sample rate
-            1024,   // chunk size
-            1,      // sub chunks
-            1,      // channels (mono)
-        )?;
-        
-        Ok(Self {
-            resampler,
-            input_buffer: vec![Vec::new()],
-        })
-    }
+2. **同一サンプルレートの最適化**
 
-    pub fn process(&mut self, input: &[f32]) -> Vec<f32> {
-        self.input_buffer[0] = input.to_vec();
-        
-        let output = self.resampler
-            .process(&self.input_buffer, None)
-            .unwrap_or_default();
-        
-        output.into_iter().next().unwrap_or_default()
-    }
-}
-```
+   - 入力と出力が同じ場合はリサンプリングをスキップ
 
-## 3. Voice Activity Detection (Silero VAD)
+3. **柔軟な設計**
+   - 任意のサンプルレート変換に対応
+   - チャンク単位での処理が可能
 
-無音区間を除去してWhisperへの入力を最適化。ハルシネーション防止にも効果的。
+### パラメータ
 
-### VADラッパー
+| パラメータ          | 値              | 説明                     |
+| ------------------- | --------------- | ------------------------ |
+| sinc_len            | 256             | Sinc フィルタの長さ      |
+| f_cutoff            | 0.95            | カットオフ周波数         |
+| interpolation       | Linear          | 補間タイプ               |
+| oversampling_factor | 256             | オーバーサンプリング係数 |
+| window              | BlackmanHarris2 | ウィンドウ関数           |
+
+### 使用例
 
 ```rust
-use voice_activity_detector::{VoiceActivityDetector, LabeledAudio};
-
-pub struct VadProcessor {
-    vad: VoiceActivityDetector,
-    threshold: f32,
-    speech_buffer: Vec<f32>,
-    silence_frames: usize,
-    min_silence_frames: usize,  // 音声終了判定用
-}
-
-impl VadProcessor {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        let vad = VoiceActivityDetector::builder()
-            .sample_rate(16000)
-            .chunk_size(512)  // 32ms @ 16kHz
-            .build()?;
-
-        Ok(Self {
-            vad,
-            threshold: 0.5,
-            speech_buffer: Vec::new(),
-            silence_frames: 0,
-            min_silence_frames: 10,  // ~320ms of silence to end
-        })
-    }
-
-    /// チャンクを処理し、音声終了時にバッファを返す
-    pub fn process(&mut self, chunk: &[f32]) -> Option<Vec<f32>> {
-        let probability = self.vad.predict(chunk.iter().copied());
-
-        if probability > self.threshold {
-            // 音声検出
-            self.speech_buffer.extend_from_slice(chunk);
-            self.silence_frames = 0;
-            None
-        } else if !self.speech_buffer.is_empty() {
-            // 無音だがバッファあり
-            self.silence_frames += 1;
-            
-            if self.silence_frames >= self.min_silence_frames {
-                // 十分な無音 → 音声終了
-                let speech = std::mem::take(&mut self.speech_buffer);
-                self.silence_frames = 0;
-                Some(speech)
-            } else {
-                // まだ継続中（短い無音は含める）
-                self.speech_buffer.extend_from_slice(chunk);
-                None
-            }
-        } else {
-            // 無音でバッファなし → 何もしない
-            None
-        }
-    }
-
-    /// 強制的にバッファを取得（録音終了時）
-    pub fn flush(&mut self) -> Option<Vec<f32>> {
-        if self.speech_buffer.is_empty() {
-            None
-        } else {
-            Some(std::mem::take(&mut self.speech_buffer))
-        }
-    }
-}
+let resampler = Resampler::new(16000); // 16kHz にリサンプリング
+let output = resampler.resample(&input, 48000)?; // 48kHz から変換
 ```
 
-### VADパラメータ調整
+---
 
-| パラメータ | 推奨値 | 説明 |
-|-----------|--------|------|
-| threshold | 0.5 | 音声判定閾値（0.3-0.7で調整） |
-| chunk_size | 512 | 32ms @ 16kHz |
-| min_silence_frames | 10 | 音声終了判定の無音フレーム数 |
+## 3. Voice Activity Detection (VAD) - Phase 2 で実装予定
 
-## 4. 統合パイプライン
+無音区間を除去して Whisper への入力を最適化。ハルシネーション防止にも効果的。
 
-```rust
-use tokio::sync::mpsc;
+### 計画
 
-pub struct AudioPipeline {
-    resampler: AudioResampler,
-    vad: VadProcessor,
-}
+- **ライブラリ**: `voice_activity_detector` クレート
+- **モデル**: Silero VAD
+- **処理**: 発話区間のみを Whisper に送信
 
-impl AudioPipeline {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(Self {
-            resampler: AudioResampler::new()?,
-            vad: VadProcessor::new()?,
-        })
-    }
+### 期待される効果
 
-    /// 生オーディオを処理し、音声チャンクを生成
-    pub fn process_raw_audio(
-        &mut self,
-        raw: &[f32],
-        is_stereo: bool,
-    ) -> Option<Vec<f32>> {
-        // 1. Stereo→Mono
-        let mono = if is_stereo {
-            stereo_to_mono(raw)
-        } else {
-            raw.to_vec()
-        };
+1. **ハルシネーション防止**
 
-        // 2. Resample to 16kHz
-        let resampled = self.resampler.process(&mono);
+   - 無音時の誤認識（「ご視聴ありがとう」等）を防止
 
-        // 3. VAD processing
-        // 512サンプルずつ処理
-        for chunk in resampled.chunks(512) {
-            if chunk.len() == 512 {
-                if let Some(speech) = self.vad.process(chunk) {
-                    return Some(speech);
-                }
-            }
-        }
-        None
-    }
+2. **処理効率化**
 
-    pub fn flush(&mut self) -> Option<Vec<f32>> {
-        self.vad.flush()
-    }
-}
-```
+   - 不要な音声データを除外して推論時間を短縮
 
-## 5. 最小音声長チェック
+3. **精度向上**
+   - 音声区間に集中することで認識精度が向上
 
-短すぎる音声はWhisperの精度が低下するためスキップ。
-
-```rust
-const MIN_SPEECH_DURATION_MS: u64 = 300;  // 最小300ms
-const SAMPLE_RATE: u32 = 16000;
-
-pub fn is_valid_speech(samples: &[f32]) -> bool {
-    let duration_ms = (samples.len() as u64 * 1000) / SAMPLE_RATE as u64;
-    duration_ms >= MIN_SPEECH_DURATION_MS
-}
-```
-
-## 6. エラーハンドリング
-
-```rust
-#[derive(Debug, thiserror::Error)]
-pub enum AudioError {
-    #[error("No input device found")]
-    NoInputDevice,
-    
-    #[error("Unsupported audio format")]
-    UnsupportedFormat,
-    
-    #[error("Stream error: {0}")]
-    StreamError(String),
-    
-    #[error("VAD initialization failed: {0}")]
-    VadError(String),
-    
-    #[error("Resampler error: {0}")]
-    ResamplerError(String),
-}
-```
-
-## 7. テスト用ユーティリティ
-
-```rust
-/// WAVファイルからf32サンプルを読み込み（テスト用）
-pub fn load_wav_as_f32(path: &str) -> Result<(Vec<f32>, u32), Box<dyn std::error::Error>> {
-    let mut reader = hound::WavReader::open(path)?;
-    let spec = reader.spec();
-    
-    let samples: Vec<f32> = match spec.sample_format {
-        hound::SampleFormat::Float => {
-            reader.samples::<f32>().filter_map(|s| s.ok()).collect()
-        }
-        hound::SampleFormat::Int => {
-            let max = (1 << (spec.bits_per_sample - 1)) as f32;
-            reader.samples::<i32>()
-                .filter_map(|s| s.ok())
-                .map(|s| s as f32 / max)
-                .collect()
-        }
-    };
-    
-    Ok((samples, spec.sample_rate))
-}
-```
+---
 
 ## パフォーマンス考慮事項
 
-1. **バッファサイズ**: cpalの`BufferSize::Fixed(1024)`で安定性とレイテンシーのバランス
-2. **チャンネル変換**: 可能なら入力デバイスをmonoに設定してオーバーヘッド削減
-3. **VADチャンク**: 512サンプル（32ms）が精度と速度のバランス良好
-4. **メモリ**: speech_bufferは最大30秒分（480,000サンプル≈1.9MB）に制限推奨
+1. **バッファサイズ**
+
+   - cpal のデフォルトバッファサイズで安定性とレイテンシーのバランスを確保
+
+2. **メモリ使用量**
+
+   - 長時間録音時のバッファサイズに注意
+   - 必要に応じて最大録音時間の制限を実装
+
+3. **CPU/GPU 使用率**
+   - リサンプリングは CPU で処理
+   - Whisper 推論は GPU (CUDA) で高速化
+
+---
+
+## 関連ファイル
+
+- `src-tauri/src/audio/capture.rs` - 音声キャプチャ
+- `src-tauri/src/audio/resample.rs` - リサンプリング
+- `src-tauri/src/audio/mod.rs` - モジュール定義
+- `src-tauri/src/whisper/transcribe.rs` - Whisper 推論
+
+---
+
+## 参考リソース
+
+- [cpal Documentation](https://docs.rs/cpal/) - クロスプラットフォーム音声 I/O
+- [rubato Documentation](https://docs.rs/rubato/) - 高品質リサンプリング
+- [Silero VAD](https://github.com/snakers4/silero-vad) - 音声活動検出（今後統合予定）
