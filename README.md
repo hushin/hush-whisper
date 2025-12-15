@@ -22,8 +22,20 @@ Windows 向けローカル音声入力アプリ。グローバルショートカ
 - pnpm
 - Visual Studio 2022 (C++ ビルドツール)
 - CMake
-- LLVM (`winget install LLVM.LLVM`)
+- LLVM
 - CUDA Toolkit 12.x+ (GPU アクセラレーション使用時)
+
+```PowerShell
+winget install --id Kitware.CMake -e
+winget install --id LLVM.LLVM -e
+winget install --id Microsoft.VisualStudio.2022.Community -e
+winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --quiet --wait"
+```
+
+```PowerShell
+# 管理者権限の PowerShell で実行
+Copy-Item "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0\extras\visual_studio_integration\MSBuildExtensions\*" "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Microsoft\VC\v170\BuildCustomizations\" -Force
+```
 
 ### インストール
 
