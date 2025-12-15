@@ -1,6 +1,4 @@
-# Configuration for building whisper-rs on Windows
-# Uses Ninja generator to avoid Visual Studio version compatibility issues
-# CMAKE_CUDA_FLAGS allows VS 18 (2026) which is not officially supported by CUDA 13.0
+# Configuration for bindgen to find libclang and system headers
 [env]
-CMAKE_GENERATOR = "Ninja"
-CMAKE_CUDA_FLAGS = "-allow-unsupported-compiler"
+LIBCLANG_PATH = "C:/Program Files/LLVM/bin"
+BINDGEN_EXTRA_CLANG_ARGS = "-I'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/include' -I'C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/ucrt'"

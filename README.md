@@ -21,18 +21,9 @@ Windows 向けローカル音声入力アプリ。グローバルショートカ
 - Rust 1.70+
 - pnpm
 - Visual Studio 2022 (C++ ビルドツール)
-- **Ninja** (CMake generator)
 - CMake
-
-### Ninja のインストール
-
-```bash
-# winget
-winget install Ninja-build.Ninja
-
-# または scoop
-scoop install ninja
-```
+- LLVM (`winget install LLVM.LLVM`)
+- CUDA Toolkit 12.x+ (GPU アクセラレーション使用時)
 
 ### インストール
 
@@ -70,7 +61,7 @@ pnpm tauri build
 ```
 src-tauri/
   .cargo/
-    config.toml  # CMAKE_GENERATOR=Ninja の設定
+    config.toml  # bindgen 用の設定 (LLVM パス等)
   src/
     audio/       # 音声キャプチャ・リサンプリング
     clipboard/   # クリップボード操作

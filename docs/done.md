@@ -52,8 +52,8 @@ Phase 1 の全機能が実装完了しました。
 
 **ビルド環境設定** (`.cargo/config.toml`):
 
-- `CMAKE_GENERATOR=Ninja`: Visual Studio 18 (2026) は cmake クレートでまだサポートされていないため
-- `CMAKE_CUDA_FLAGS="-allow-unsupported-compiler"`: CUDA 13.0 は VS 2019-2022 のみ公式サポートのため
+- `LIBCLANG_PATH`: LLVM の libclang パス（bindgen が使用）
+- `BINDGEN_EXTRA_CLANG_ARGS`: VS のヘッダパスを指定（stdbool.h 等の解決用）
 
 ### 1.5 クリップボード出力 ✅
 

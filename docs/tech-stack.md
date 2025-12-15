@@ -53,10 +53,11 @@
 
 - Visual Studio 2022 (C++ ビルドツール)
 - CMake
-- Ninja (CMake Generator)
-- CUDA Toolkit 12.x (GPU アクセラレーション使用時)
+- LLVM (`winget install LLVM.LLVM`)
+- CUDA Toolkit 12.x+ (GPU アクセラレーション使用時)
 
 ### 注意事項
 
-- whisper-rs の CUDA ビルドには `CMAKE_GENERATOR=Ninja` と `CMAKE_CUDA_FLAGS="-allow-unsupported-compiler"` が必要
-- Visual Studio 2026 (v18) は cmake クレートでまだ未サポートのため Ninja を使用
+- whisper-rs のビルドには bindgen が必要で、LLVM の libclang を使用
+- `.cargo/config.toml` で `LIBCLANG_PATH` と `BINDGEN_EXTRA_CLANG_ARGS` を設定
+- CUDA 統合: VS 2022 Build Tools インストール後、CUDA の MSBuildExtensions を手動コピーが必要な場合あり
