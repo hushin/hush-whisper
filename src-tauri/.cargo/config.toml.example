@@ -1,0 +1,11 @@
+# Configuration for bindgen to find libclang and system headers
+# Copy this file to config.toml and adjust paths for your environment
+#
+# To find your paths:
+#   LLVM: where libclang.dll is located (usually C:/Program Files/LLVM/bin)
+#   MSVC: dir "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC"
+#   Windows SDK: dir "C:/Program Files (x86)/Windows Kits/10/Include"
+
+[env]
+LIBCLANG_PATH = "C:/Program Files/LLVM/bin"
+BINDGEN_EXTRA_CLANG_ARGS = "-I'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/VC/Tools/MSVC/14.44.35207/include' -I'C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0/ucrt'"

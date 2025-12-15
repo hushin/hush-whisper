@@ -43,6 +43,9 @@ Copy-Item "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.0\extras\visua
 # 依存関係のインストール
 pnpm install
 
+# Cargo 設定ファイルをコピー（パスは環境に合わせて編集）
+cp src-tauri/.cargo/config.toml.example src-tauri/.cargo/config.toml
+
 # 開発モードで起動
 pnpm tauri dev
 
@@ -73,7 +76,7 @@ pnpm tauri build
 ```
 src-tauri/
   .cargo/
-    config.toml  # bindgen 用の設定 (LLVM パス等)
+    config.toml.example  # bindgen 用の設定テンプレート
   src/
     audio/       # 音声キャプチャ・リサンプリング
     clipboard/   # クリップボード操作
