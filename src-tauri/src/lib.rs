@@ -2,6 +2,7 @@ mod audio;
 mod clipboard;
 mod config;
 mod llm;
+mod log;
 mod shortcuts;
 mod tray;
 mod whisper;
@@ -358,7 +359,9 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
             .map_err(|e| format!("Failed to emit event: {}", e))?;
 
         let ollama = OllamaClient::new(&settings.llm.ollama_url, &settings.llm.model_name);
-        match ollama.refine_text(&text).await {
+        let prompt_template = settings.llm.get_prompt_template();
+        tracing::info!("Using prompt preset: {:?}", settings.llm.preset);
+        match ollama.refine_text_with_prompt(&text, &prompt_template).await {
             Ok(refined) => {
                 tracing::info!("LLM refined: {} -> {}", text, refined);
                 app.emit("llm-refinement-complete", refined.clone())
@@ -376,7 +379,32 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
         text.clone()
     };
 
-    // Phase 3: Copy to clipboard (sync, brief lock)
+    // Phase 3: Save log entry
+    {
+        if let Ok(log_manager) = log::LogManager::new() {
+            let refined = if settings.llm.enabled {
+                Some(final_text.clone())
+            } else {
+                None
+            };
+            let preset_name = if settings.llm.enabled {
+                Some(format!("{:?}", settings.llm.preset))
+            } else {
+                None
+            };
+            if let Err(e) = log_manager.add_entry(
+                text.clone(),
+                refined,
+                None, // audio_duration_secs - could be calculated if needed
+                settings.llm.enabled,
+                preset_name,
+            ) {
+                tracing::warn!("Failed to save log entry: {}", e);
+            }
+        }
+    }
+
+    // Phase 4: Copy to clipboard (sync, brief lock)
     {
         let mut clipboard_guard = state.clipboard.lock().unwrap();
         if clipboard_guard.is_none() {
@@ -436,9 +464,59 @@ fn save_llm_settings(enabled: bool, ollama_url: String, model_name: String) -> R
 }
 
 #[tauri::command]
+fn save_prompt_settings(preset: String, custom_prompt: String) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.llm.preset = match preset.as_str() {
+        "Default" => config::PromptPreset::Default,
+        "Meeting" => config::PromptPreset::Meeting,
+        "Memo" => config::PromptPreset::Memo,
+        "Chat" => config::PromptPreset::Chat,
+        "Custom" => config::PromptPreset::Custom,
+        _ => config::PromptPreset::Default,
+    };
+    settings.llm.custom_prompt = custom_prompt;
+    config::save_settings(&settings)
+}
+
+#[tauri::command]
+fn get_preset_prompts() -> Vec<(String, String)> {
+    vec![
+        ("Default".to_string(), config::get_preset_prompt(&config::PromptPreset::Default).to_string()),
+        ("Meeting".to_string(), config::get_preset_prompt(&config::PromptPreset::Meeting).to_string()),
+        ("Memo".to_string(), config::get_preset_prompt(&config::PromptPreset::Memo).to_string()),
+        ("Chat".to_string(), config::get_preset_prompt(&config::PromptPreset::Chat).to_string()),
+    ]
+}
+
+#[tauri::command]
 async fn check_ollama_status(ollama_url: String) -> Result<bool, String> {
     let client = OllamaClient::new(&ollama_url, "");
     Ok(client.is_available().await)
+}
+
+// Log management commands
+#[tauri::command]
+fn get_recent_logs(limit: Option<usize>) -> Result<Vec<log::LogEntry>, String> {
+    let log_manager = log::LogManager::new()?;
+    Ok(log_manager.get_recent_logs(limit.unwrap_or(50)))
+}
+
+#[tauri::command]
+fn get_logs_for_date(year: i32, month: u32, day: u32) -> Result<Vec<log::LogEntry>, String> {
+    let log_manager = log::LogManager::new()?;
+    Ok(log_manager.get_logs_for_date(year, month, day))
+}
+
+#[tauri::command]
+fn get_available_log_dates() -> Result<Vec<String>, String> {
+    let log_manager = log::LogManager::new()?;
+    Ok(log_manager.get_available_dates())
+}
+
+#[tauri::command]
+fn delete_log_entry(id: String) -> Result<bool, String> {
+    let log_manager = log::LogManager::new()?;
+    log_manager.delete_entry(&id)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -496,7 +574,13 @@ pub fn run() {
             get_settings,
             save_model_selection,
             save_llm_settings,
+            save_prompt_settings,
+            get_preset_prompts,
             check_ollama_status,
+            get_recent_logs,
+            get_logs_for_date,
+            get_available_log_dates,
+            delete_log_entry,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

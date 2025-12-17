@@ -18,6 +18,76 @@ pub struct WhisperSettings {
     pub model_name: String,
 }
 
+/// Available prompt presets
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum PromptPreset {
+    /// Default: Natural Japanese text formatting
+    Default,
+    /// Meeting notes: Format as meeting minutes
+    Meeting,
+    /// Memo: Short, concise notes
+    Memo,
+    /// Chat: Casual conversation style
+    Chat,
+    /// Custom: User-defined prompt
+    Custom,
+}
+
+impl Default for PromptPreset {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+/// Get the prompt template for a preset
+pub fn get_preset_prompt(preset: &PromptPreset) -> &'static str {
+    match preset {
+        PromptPreset::Default => {
+            r#"以下の音声認識結果を自然な日本語に整形してください。
+誤字脱字の修正、句読点の追加、文法の修正を行ってください。
+整形後のテキストのみを出力してください。余計な説明は不要です。
+
+入力: {input}
+
+出力:"#
+        }
+        PromptPreset::Meeting => {
+            r#"以下の音声認識結果を議事録形式で整形してください。
+- 発言内容を箇条書きで整理
+- 重要なポイントや決定事項を明確に
+- 誤字脱字を修正
+整形後のテキストのみを出力してください。
+
+入力: {input}
+
+出力:"#
+        }
+        PromptPreset::Memo => {
+            r#"以下の音声認識結果を簡潔なメモに整形してください。
+- 要点を短くまとめる
+- 不要な言葉を省く
+- 誤字脱字を修正
+整形後のテキストのみを出力してください。
+
+入力: {input}
+
+出力:"#
+        }
+        PromptPreset::Chat => {
+            r#"以下の音声認識結果をカジュアルなチャット文に整形してください。
+- 口語的な表現を維持
+- 適度な絵文字や句読点を追加
+- 誤字脱字のみ修正
+整形後のテキストのみを出力してください。
+
+入力: {input}
+
+出力:"#
+        }
+        PromptPreset::Custom => "",
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmSettings {
     /// Whether LLM refinement is enabled
@@ -26,6 +96,12 @@ pub struct LlmSettings {
     pub ollama_url: String,
     /// Model name to use
     pub model_name: String,
+    /// Selected prompt preset
+    #[serde(default)]
+    pub preset: PromptPreset,
+    /// Custom prompt template (used when preset is Custom)
+    #[serde(default)]
+    pub custom_prompt: String,
 }
 
 impl Default for LlmSettings {
@@ -34,6 +110,23 @@ impl Default for LlmSettings {
             enabled: false,
             ollama_url: "http://localhost:11434".to_string(),
             model_name: "gpt-oss:20b".to_string(),
+            preset: PromptPreset::Default,
+            custom_prompt: String::new(),
+        }
+    }
+}
+
+impl LlmSettings {
+    /// Get the effective prompt template based on preset or custom prompt
+    pub fn get_prompt_template(&self) -> String {
+        if self.preset == PromptPreset::Custom {
+            if self.custom_prompt.is_empty() {
+                get_preset_prompt(&PromptPreset::Default).to_string()
+            } else {
+                self.custom_prompt.clone()
+            }
+        } else {
+            get_preset_prompt(&self.preset).to_string()
         }
     }
 }

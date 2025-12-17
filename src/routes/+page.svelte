@@ -19,10 +19,14 @@
     model_name: string;
   }
 
+  type PromptPreset = "Default" | "Meeting" | "Memo" | "Chat" | "Custom";
+
   interface LlmSettings {
     enabled: boolean;
     ollama_url: string;
     model_name: string;
+    preset: PromptPreset;
+    custom_prompt: string;
   }
 
   interface Settings {
@@ -50,6 +54,36 @@
   let isCheckingOllama = $state(false);
   let isLlmRefining = $state(false);
 
+  // Prompt settings
+  let promptPreset = $state<PromptPreset>("Default");
+  let customPrompt = $state("");
+  let presetPrompts = $state<Map<string, string>>(new Map());
+  let showPromptEditor = $state(false);
+
+  const presetDescriptions: Record<PromptPreset, string> = {
+    Default: "自然な日本語に整形",
+    Meeting: "議事録形式で整理",
+    Memo: "簡潔なメモに要約",
+    Chat: "カジュアルなチャット文",
+    Custom: "カスタムプロンプト",
+  };
+
+  // Log viewer
+  interface LogEntry {
+    id: string;
+    timestamp: string;
+    raw_text: string;
+    refined_text: string | null;
+    audio_duration_secs: number | null;
+    llm_used: boolean;
+    prompt_preset: string | null;
+  }
+
+  let showLogViewer = $state(false);
+  let logEntries = $state<LogEntry[]>([]);
+  let isLoadingLogs = $state(false);
+  let selectedLogEntry = $state<LogEntry | null>(null);
+
   function formatBytes(bytes: number): string {
     if (bytes === 0) return "0 B";
     const k = 1024;
@@ -73,11 +107,23 @@
       llmEnabled = settings.llm.enabled;
       llmOllamaUrl = settings.llm.ollama_url;
       llmModelName = settings.llm.model_name;
+      promptPreset = settings.llm.preset || "Default";
+      customPrompt = settings.llm.custom_prompt || "";
       console.log("Loaded settings, model:", selectedModel, "llm:", settings.llm, "is_saved:", settings.is_saved);
       return settings.is_saved;
     } catch (error) {
       console.error("Failed to load settings:", error);
       return false;
+    }
+  }
+
+  async function loadPresetPrompts() {
+    try {
+      const presets: [string, string][] = await invoke("get_preset_prompts");
+      presetPrompts = new Map(presets);
+      console.log("Loaded preset prompts:", presetPrompts);
+    } catch (error) {
+      console.error("Failed to load preset prompts:", error);
     }
   }
 
@@ -100,6 +146,82 @@
       console.log("Saved LLM settings");
     } catch (error) {
       console.error("Failed to save LLM settings:", error);
+    }
+  }
+
+  async function savePromptSettings() {
+    try {
+      await invoke("save_prompt_settings", {
+        preset: promptPreset,
+        customPrompt: customPrompt,
+      });
+      console.log("Saved prompt settings:", promptPreset);
+    } catch (error) {
+      console.error("Failed to save prompt settings:", error);
+    }
+  }
+
+  function handlePresetChange(event: Event) {
+    const select = event.target as HTMLSelectElement;
+    promptPreset = select.value as PromptPreset;
+    // If switching to Custom and no custom prompt exists, use current preset's prompt as starting point
+    if (promptPreset === "Custom" && !customPrompt) {
+      const currentPresetPrompt = presetPrompts.get("Default") || "";
+      customPrompt = currentPresetPrompt;
+    }
+    savePromptSettings();
+  }
+
+  function getCurrentPromptPreview(): string {
+    if (promptPreset === "Custom") {
+      return customPrompt || "(カスタムプロンプト未設定)";
+    }
+    return presetPrompts.get(promptPreset) || "";
+  }
+
+  // Log viewer functions
+  async function loadRecentLogs() {
+    isLoadingLogs = true;
+    try {
+      logEntries = await invoke("get_recent_logs", { limit: 50 });
+      console.log("Loaded logs:", logEntries.length);
+    } catch (error) {
+      console.error("Failed to load logs:", error);
+    } finally {
+      isLoadingLogs = false;
+    }
+  }
+
+  async function deleteLogEntry(id: string) {
+    try {
+      const deleted: boolean = await invoke("delete_log_entry", { id });
+      if (deleted) {
+        logEntries = logEntries.filter((entry) => entry.id !== id);
+        if (selectedLogEntry?.id === id) {
+          selectedLogEntry = null;
+        }
+        console.log("Deleted log entry:", id);
+      }
+    } catch (error) {
+      console.error("Failed to delete log entry:", error);
+    }
+  }
+
+  function formatLogTimestamp(timestamp: string): string {
+    const date = new Date(timestamp);
+    return date.toLocaleString("ja-JP", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function toggleLogViewer() {
+    showLogViewer = !showLogViewer;
+    if (showLogViewer && logEntries.length === 0) {
+      loadRecentLogs();
     }
   }
 
@@ -156,6 +278,7 @@
     // Load available models first, then settings, then auto-initialize if saved
     (async () => {
       await loadModels();
+      await loadPresetPrompts();
       const hasSavedSettings = await loadSettings();
       if (hasSavedSettings) {
         console.log("Auto-initializing saved model:", selectedModel);
@@ -364,6 +487,52 @@
             placeholder="gpt-oss:20b"
           />
         </div>
+
+        <div class="input-group">
+          <label for="prompt-preset">プロンプトプリセット</label>
+          <select
+            id="prompt-preset"
+            value={promptPreset}
+            onchange={handlePresetChange}
+            class="preset-select"
+          >
+            <option value="Default">{presetDescriptions.Default}</option>
+            <option value="Meeting">{presetDescriptions.Meeting}</option>
+            <option value="Memo">{presetDescriptions.Memo}</option>
+            <option value="Chat">{presetDescriptions.Chat}</option>
+            <option value="Custom">{presetDescriptions.Custom}</option>
+          </select>
+        </div>
+
+        <div class="prompt-preview-section">
+          <div class="prompt-preview-header">
+            <span class="preview-label">現在のプロンプト</span>
+            <button
+              class="toggle-preview-button"
+              onclick={() => showPromptEditor = !showPromptEditor}
+            >
+              {showPromptEditor ? "閉じる" : promptPreset === "Custom" ? "編集" : "プレビュー"}
+            </button>
+          </div>
+          {#if showPromptEditor}
+            <div class="prompt-editor">
+              {#if promptPreset === "Custom"}
+                <textarea
+                  bind:value={customPrompt}
+                  onblur={savePromptSettings}
+                  placeholder={"カスタムプロンプトを入力...\n{input} が音声認識結果に置換されます"}
+                  class="prompt-textarea"
+                  rows="8"
+                ></textarea>
+                <p class="prompt-hint">
+                  <code>{"{input}"}</code> が音声認識結果に置換されます
+                </p>
+              {:else}
+                <pre class="prompt-preview">{getCurrentPromptPreview()}</pre>
+              {/if}
+            </div>
+          {/if}
+        </div>
       </div>
     {/if}
 
@@ -412,6 +581,78 @@
         <p class="placeholder">認識結果がここに表示されます</p>
       {/if}
     </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h2>履歴</h2>
+      <button class="toggle-logs-button" onclick={toggleLogViewer}>
+        {showLogViewer ? "閉じる" : "履歴を表示"}
+      </button>
+    </div>
+
+    {#if showLogViewer}
+      <div class="log-viewer">
+        {#if isLoadingLogs}
+          <p class="loading">読み込み中...</p>
+        {:else if logEntries.length === 0}
+          <p class="no-logs">履歴がありません</p>
+        {:else}
+          <div class="log-list">
+            {#each logEntries as entry (entry.id)}
+              <div
+                class="log-entry"
+                class:selected={selectedLogEntry?.id === entry.id}
+                onclick={() => selectedLogEntry = selectedLogEntry?.id === entry.id ? null : entry}
+                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectedLogEntry = selectedLogEntry?.id === entry.id ? null : entry; }}}
+                role="button"
+                tabindex="0"
+              >
+                <div class="log-entry-header">
+                  <span class="log-timestamp">{formatLogTimestamp(entry.timestamp)}</span>
+                  {#if entry.llm_used}
+                    <span class="log-badge llm">LLM</span>
+                  {/if}
+                  <button
+                    class="delete-button"
+                    onclick={(e) => { e.stopPropagation(); deleteLogEntry(entry.id); }}
+                    title="削除"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p class="log-text-preview">
+                  {entry.refined_text || entry.raw_text}
+                </p>
+                {#if selectedLogEntry?.id === entry.id}
+                  <div class="log-details">
+                    <div class="detail-row">
+                      <span class="detail-label">認識結果:</span>
+                      <span class="detail-value">{entry.raw_text}</span>
+                    </div>
+                    {#if entry.refined_text}
+                      <div class="detail-row">
+                        <span class="detail-label">整形後:</span>
+                        <span class="detail-value">{entry.refined_text}</span>
+                      </div>
+                    {/if}
+                    {#if entry.prompt_preset}
+                      <div class="detail-row">
+                        <span class="detail-label">プリセット:</span>
+                        <span class="detail-value">{entry.prompt_preset}</span>
+                      </div>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
+          <button class="refresh-button" onclick={loadRecentLogs} disabled={isLoadingLogs}>
+            更新
+          </button>
+        {/if}
+      </div>
+    {/if}
   </div>
 </main>
 
@@ -591,6 +832,101 @@
   .input-group input[type="text"]:focus {
     outline: none;
     border-color: #396cd8;
+  }
+
+  .preset-select {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background-color: white;
+    cursor: pointer;
+  }
+
+  .preset-select:focus {
+    outline: none;
+    border-color: #396cd8;
+  }
+
+  .prompt-preview-section {
+    margin-top: 1rem;
+    border-top: 1px solid #e0e0e0;
+    padding-top: 1rem;
+  }
+
+  .prompt-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .preview-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #555;
+  }
+
+  .toggle-preview-button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+    min-width: auto;
+  }
+
+  .toggle-preview-button:hover {
+    background-color: #e0e0e0;
+  }
+
+  .prompt-editor {
+    margin-top: 0.5rem;
+  }
+
+  .prompt-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-family: monospace;
+    resize: vertical;
+    box-sizing: border-box;
+    line-height: 1.5;
+  }
+
+  .prompt-textarea:focus {
+    outline: none;
+    border-color: #396cd8;
+  }
+
+  .prompt-preview {
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.8rem;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .prompt-hint {
+    margin-top: 0.5rem;
+    font-size: 0.8rem;
+    color: #666;
+  }
+
+  .prompt-hint code {
+    background-color: #f0f0f0;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-family: monospace;
   }
 
   .url-input-row {
@@ -775,6 +1111,161 @@
     margin: 2rem 0;
   }
 
+  /* Log viewer styles */
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .section-header h2 {
+    margin: 0;
+  }
+
+  .toggle-logs-button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+    min-width: auto;
+  }
+
+  .toggle-logs-button:hover {
+    background-color: #e0e0e0;
+  }
+
+  .log-viewer {
+    margin-top: 1rem;
+  }
+
+  .log-list {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+  }
+
+  .log-entry {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #e0e0e0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .log-entry:last-child {
+    border-bottom: none;
+  }
+
+  .log-entry:hover {
+    background-color: #f5f5f5;
+  }
+
+  .log-entry.selected {
+    background-color: #e8f4ff;
+  }
+
+  .log-entry-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .log-timestamp {
+    font-size: 0.8rem;
+    color: #666;
+  }
+
+  .log-badge {
+    font-size: 0.7rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .log-badge.llm {
+    background-color: #e3f2fd;
+    color: #1976d2;
+  }
+
+  .delete-button {
+    margin-left: auto;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.9rem;
+    background-color: transparent;
+    color: #999;
+    border: none;
+    cursor: pointer;
+    min-width: auto;
+  }
+
+  .delete-button:hover {
+    color: #f44336;
+    background-color: transparent;
+  }
+
+  .log-text-preview {
+    font-size: 0.9rem;
+    color: #333;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .log-details {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px dashed #e0e0e0;
+  }
+
+  .detail-row {
+    margin-bottom: 0.5rem;
+  }
+
+  .detail-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .detail-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #666;
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  .detail-value {
+    font-size: 0.85rem;
+    color: #333;
+    display: block;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .refresh-button {
+    margin-top: 1rem;
+    width: 100%;
+    padding: 0.5rem;
+    font-size: 0.9rem;
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+  }
+
+  .refresh-button:hover:not(:disabled) {
+    background-color: #e0e0e0;
+  }
+
+  .loading,
+  .no-logs {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+  }
+
   @media (prefers-color-scheme: dark) {
     :root {
       color: #f6f6f6;
@@ -849,6 +1340,126 @@
       background-color: #1a1a1a;
       color: #f6f6f6;
       border-color: #444;
+    }
+
+    .preset-select {
+      background-color: #1a1a1a;
+      color: #f6f6f6;
+      border-color: #444;
+    }
+
+    .prompt-preview-section {
+      border-color: #444;
+    }
+
+    .preview-label {
+      color: #aaa;
+    }
+
+    .toggle-preview-button {
+      background-color: #333;
+      color: #f6f6f6;
+      border-color: #555;
+    }
+
+    .toggle-preview-button:hover {
+      background-color: #444;
+    }
+
+    .prompt-textarea {
+      background-color: #1a1a1a;
+      color: #f6f6f6;
+      border-color: #444;
+    }
+
+    .prompt-preview {
+      background-color: #1a1a1a;
+      border-color: #444;
+      color: #f6f6f6;
+    }
+
+    .prompt-hint {
+      color: #888;
+    }
+
+    .prompt-hint code {
+      background-color: #333;
+      color: #f6f6f6;
+    }
+
+    /* Log viewer dark mode */
+    .toggle-logs-button {
+      background-color: #333;
+      color: #f6f6f6;
+      border-color: #555;
+    }
+
+    .toggle-logs-button:hover {
+      background-color: #444;
+    }
+
+    .log-list {
+      border-color: #444;
+    }
+
+    .log-entry {
+      border-color: #444;
+    }
+
+    .log-entry:hover {
+      background-color: #333;
+    }
+
+    .log-entry.selected {
+      background-color: #1a3a5c;
+    }
+
+    .log-timestamp {
+      color: #aaa;
+    }
+
+    .log-badge.llm {
+      background-color: #1a3a5c;
+      color: #90caf9;
+    }
+
+    .delete-button {
+      color: #888;
+    }
+
+    .delete-button:hover {
+      color: #f44336;
+    }
+
+    .log-text-preview {
+      color: #f6f6f6;
+    }
+
+    .log-details {
+      border-color: #444;
+    }
+
+    .detail-label {
+      color: #aaa;
+    }
+
+    .detail-value {
+      color: #f6f6f6;
+    }
+
+    .refresh-button {
+      background-color: #333;
+      color: #f6f6f6;
+      border-color: #555;
+    }
+
+    .refresh-button:hover:not(:disabled) {
+      background-color: #444;
+    }
+
+    .loading,
+    .no-logs {
+      color: #888;
     }
   }
 </style>
