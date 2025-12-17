@@ -6,6 +6,8 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub whisper: WhisperSettings,
+    #[serde(default)]
+    pub llm: LlmSettings,
     /// Whether settings were loaded from a saved file (not defaults)
     #[serde(skip_deserializing, default)]
     pub is_saved: bool,
@@ -16,12 +18,33 @@ pub struct WhisperSettings {
     pub model_name: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmSettings {
+    /// Whether LLM refinement is enabled
+    pub enabled: bool,
+    /// Ollama API base URL
+    pub ollama_url: String,
+    /// Model name to use
+    pub model_name: String,
+}
+
+impl Default for LlmSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            ollama_url: "http://localhost:11434".to_string(),
+            model_name: "gpt-oss:20b".to_string(),
+        }
+    }
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
             whisper: WhisperSettings {
                 model_name: "large-v3-turbo".to_string(),
             },
+            llm: LlmSettings::default(),
             is_saved: false,
         }
     }

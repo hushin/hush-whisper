@@ -71,19 +71,44 @@ Phase 1 の全機能が実装完了しました。詳細は [`docs/done.md`](./d
 - Silero VAD V5 モデルで発話区間を検出
 - 512 サンプル (32ms) ごとに判定、パディング付き
 
-### 3.2 LLM 後処理
+### 3.2 LLM 後処理（Ollama 連携）
+
+> **注意**: whisper-rs-sys と llama-cpp-sys-2 の両方が ggml ライブラリを静的リンクするため、
+> リンク時に重複シンボルエラー（LNK2005）が発生する問題を回避するため、Ollama HTTP API を使用。
+>
+> 参考:
+> - https://github.com/ggml-org/llama.cpp/issues/9267
+> - https://github.com/ggml-org/llama.cpp/issues/11303
+
+**前提条件**:
+
+- Ollama をローカルで別途起動しておく
+- デフォルト URL: `http://localhost:11434`
+- デフォルトモデル: `gpt-oss:20b`
 
 **タスク**:
 
-- [ ] llama-cpp-rs 設定（CUDA）
-- [ ] Qwen2.5-7B-Instruct Q4_K_M ダウンロード
-- [ ] 整形プロンプトテンプレート作成
-- [ ] ストリーミング出力対応
+- [x] Ollama クライアントモジュール作成
+- [x] HTTP API 経由でリクエスト（POST /api/generate）
+- [x] 整形プロンプトテンプレート作成
+- [x] 設定で LLM 有効/無効切り替え
+- [x] 設定で Ollama URL・モデル名変更可能に
 
-**追加依存**:
+**Ollama API 形式**:
 
-```toml
-llama_cpp = { git = "https://github.com/edgenai/llama_cpp-rs.git", features = ["cuda"] }
+```json
+// POST http://localhost:11434/api/generate
+{
+  "model": "gpt-oss:20b",
+  "prompt": "...",
+  "stream": false
+}
+
+// Response
+{
+  "response": "整形されたテキスト",
+  "done": true
+}
 ```
 
 **プロンプト例**:
@@ -91,6 +116,7 @@ llama_cpp = { git = "https://github.com/edgenai/llama_cpp-rs.git", features = ["
 ```
 以下の音声認識結果を自然な日本語に整形してください。
 誤字脱字の修正、句読点の追加、文法の修正を行ってください。
+整形後のテキストのみを出力してください。
 
 入力: {raw_text}
 

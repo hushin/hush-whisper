@@ -33,8 +33,8 @@ voice_activity_detector = "0.2"
 # Whisper (Phase 1) - CUDA enabled for GPU acceleration
 whisper-rs = { version = "0.15", features = ["cuda"] }
 
-# Model download
-reqwest = { version = "0.12", features = ["stream"] }
+# Model download & HTTP client
+reqwest = { version = "0.12", features = ["stream", "json"] }
 futures-util = "0.3"
 
 # Clipboard

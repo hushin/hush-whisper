@@ -1,12 +1,14 @@
 mod audio;
 mod clipboard;
 mod config;
+mod llm;
 mod shortcuts;
 mod tray;
 mod whisper;
 
 use audio::{AudioCapture, Resampler, VadProcessor};
 use clipboard::ClipboardManager;
+use llm::OllamaClient;
 use shortcuts::ShortcutHandler;
 use tray::TrayManager;
 use whisper::WhisperTranscriber;
@@ -252,111 +254,148 @@ async fn start_recording(state: State<'_, AppState>, app: AppHandle) -> Result<S
 
 #[tauri::command]
 async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<String, String> {
-    let mut is_recording = state.is_recording.lock().unwrap();
+    // Phase 1: Gather all data while holding locks, then release them before any await
+    let text = {
+        let mut is_recording = state.is_recording.lock().unwrap();
 
-    if !*is_recording {
-        return Err("Not recording".to_string());
-    }
-
-    // Drop the stream to stop recording
-    *state.active_stream.lock().unwrap() = None;
-
-    let audio_capture_guard = state.audio_capture.lock().unwrap();
-    let audio_capture = audio_capture_guard
-        .as_ref()
-        .ok_or("Audio capture not initialized")?;
-
-    let audio_data = audio_capture.stop_recording();
-    let sample_rate = audio_capture.get_sample_rate();
-
-    *is_recording = false;
-
-    // Notify frontend
-    app.emit("recording-stopped", ())
-        .map_err(|e| format!("Failed to emit event: {}", e))?;
-
-    tracing::info!(
-        "Recording stopped. Captured {} samples at {} Hz",
-        audio_data.len(),
-        sample_rate
-    );
-
-    // Check if we have any audio data
-    if audio_data.is_empty() {
-        return Err("No audio data captured".to_string());
-    }
-
-    // Resample to 16kHz for Whisper
-    let resampler = Resampler::new(16000);
-    let resampled_data = resampler
-        .resample(&audio_data, sample_rate)
-        .map_err(|e| format!("Failed to resample audio: {}", e))?;
-
-    tracing::info!("Resampled to {} samples", resampled_data.len());
-
-    // Apply VAD to extract speech segments
-    let mut vad_guard = state.vad.lock().unwrap();
-    if vad_guard.is_none() {
-        match VadProcessor::new() {
-            Ok(vad) => *vad_guard = Some(vad),
-            Err(e) => tracing::warn!("Failed to create VAD, skipping: {}", e),
+        if !*is_recording {
+            return Err("Not recording".to_string());
         }
-    }
 
-    let speech_data = if let Some(vad) = vad_guard.as_mut() {
-        let extracted = vad.extract_speech(&resampled_data);
-        if extracted.is_empty() {
-            tracing::info!("VAD detected no speech, using original audio");
-            resampled_data
+        // Drop the stream to stop recording
+        *state.active_stream.lock().unwrap() = None;
+
+        let audio_capture_guard = state.audio_capture.lock().unwrap();
+        let audio_capture = audio_capture_guard
+            .as_ref()
+            .ok_or("Audio capture not initialized")?;
+
+        let audio_data = audio_capture.stop_recording();
+        let sample_rate = audio_capture.get_sample_rate();
+
+        *is_recording = false;
+        drop(is_recording);
+        drop(audio_capture_guard);
+
+        // Notify frontend
+        app.emit("recording-stopped", ())
+            .map_err(|e| format!("Failed to emit event: {}", e))?;
+
+        tracing::info!(
+            "Recording stopped. Captured {} samples at {} Hz",
+            audio_data.len(),
+            sample_rate
+        );
+
+        // Check if we have any audio data
+        if audio_data.is_empty() {
+            return Err("No audio data captured".to_string());
+        }
+
+        // Resample to 16kHz for Whisper
+        let resampler = Resampler::new(16000);
+        let resampled_data = resampler
+            .resample(&audio_data, sample_rate)
+            .map_err(|e| format!("Failed to resample audio: {}", e))?;
+
+        tracing::info!("Resampled to {} samples", resampled_data.len());
+
+        // Apply VAD to extract speech segments
+        let speech_data = {
+            let mut vad_guard = state.vad.lock().unwrap();
+            if vad_guard.is_none() {
+                match VadProcessor::new() {
+                    Ok(vad) => *vad_guard = Some(vad),
+                    Err(e) => tracing::warn!("Failed to create VAD, skipping: {}", e),
+                }
+            }
+
+            if let Some(vad) = vad_guard.as_mut() {
+                let extracted = vad.extract_speech(&resampled_data);
+                if extracted.is_empty() {
+                    tracing::info!("VAD detected no speech, using original audio");
+                    resampled_data
+                } else {
+                    extracted
+                }
+            } else {
+                resampled_data
+            }
+        };
+
+        tracing::info!("After VAD: {} samples", speech_data.len());
+
+        // Transcribe
+        app.emit("transcription-started", ())
+            .map_err(|e| format!("Failed to emit event: {}", e))?;
+
+        let whisper_guard = state.whisper.lock().unwrap();
+        let transcribed = if let Some(whisper) = whisper_guard.as_ref() {
+            // Use Whisper for transcription
+            whisper
+                .transcribe(&speech_data)
+                .map_err(|e| format!("Failed to transcribe: {}", e))?
         } else {
-            extracted
+            // Fallback to dummy mode if Whisper not initialized
+            tracing::warn!("Whisper not initialized, using dummy mode");
+            format!(
+                "[デモモード] {}サンプルの音声を録音しました。モデルを読み込んでください。",
+                speech_data.len()
+            )
+        };
+        drop(whisper_guard);
+
+        tracing::info!("Transcription result: {}", transcribed);
+        transcribed
+    };
+    // All MutexGuards are now dropped
+
+    // Phase 2: LLM refinement (async, no locks held)
+    let settings = config::load_settings();
+    let final_text = if settings.llm.enabled {
+        tracing::info!("LLM refinement enabled, sending to Ollama...");
+        app.emit("llm-refinement-started", ())
+            .map_err(|e| format!("Failed to emit event: {}", e))?;
+
+        let ollama = OllamaClient::new(&settings.llm.ollama_url, &settings.llm.model_name);
+        match ollama.refine_text(&text).await {
+            Ok(refined) => {
+                tracing::info!("LLM refined: {} -> {}", text, refined);
+                app.emit("llm-refinement-complete", refined.clone())
+                    .map_err(|e| format!("Failed to emit event: {}", e))?;
+                refined
+            }
+            Err(e) => {
+                tracing::warn!("LLM refinement failed, using original text: {}", e);
+                app.emit("llm-refinement-failed", e.clone())
+                    .map_err(|e| format!("Failed to emit event: {}", e))?;
+                text.clone()
+            }
         }
     } else {
-        resampled_data
-    };
-    drop(vad_guard);
-
-    tracing::info!("After VAD: {} samples", speech_data.len());
-
-    // Transcribe
-    app.emit("transcription-started", ())
-        .map_err(|e| format!("Failed to emit event: {}", e))?;
-
-    let whisper_guard = state.whisper.lock().unwrap();
-    let text = if let Some(whisper) = whisper_guard.as_ref() {
-        // Use Whisper for transcription
-        whisper
-            .transcribe(&speech_data)
-            .map_err(|e| format!("Failed to transcribe: {}", e))?
-    } else {
-        // Fallback to dummy mode if Whisper not initialized
-        tracing::warn!("Whisper not initialized, using dummy mode");
-        format!(
-            "[デモモード] {}サンプルの音声を録音しました。モデルを読み込んでください。",
-            speech_data.len()
-        )
+        text.clone()
     };
 
-    tracing::info!("Transcription result: {}", text);
+    // Phase 3: Copy to clipboard (sync, brief lock)
+    {
+        let mut clipboard_guard = state.clipboard.lock().unwrap();
+        if clipboard_guard.is_none() {
+            let clipboard = ClipboardManager::new()
+                .map_err(|e| format!("Failed to create clipboard manager: {}", e))?;
+            *clipboard_guard = Some(clipboard);
+        }
 
-    // Copy to clipboard
-    let mut clipboard_guard = state.clipboard.lock().unwrap();
-    if clipboard_guard.is_none() {
-        let clipboard = ClipboardManager::new()
-            .map_err(|e| format!("Failed to create clipboard manager: {}", e))?;
-        *clipboard_guard = Some(clipboard);
+        let clipboard = clipboard_guard.as_mut().unwrap();
+        clipboard
+            .set_and_paste(&final_text)
+            .map_err(|e| format!("Failed to paste text: {}", e))?;
     }
-
-    let clipboard = clipboard_guard.as_mut().unwrap();
-    clipboard
-        .set_and_paste(&text)
-        .map_err(|e| format!("Failed to paste text: {}", e))?;
 
     // Notify frontend with result
-    app.emit("transcription-complete", text.clone())
+    app.emit("transcription-complete", final_text.clone())
         .map_err(|e| format!("Failed to emit event: {}", e))?;
 
-    Ok(text)
+    Ok(final_text)
 }
 
 #[tauri::command]
@@ -385,6 +424,21 @@ fn save_model_selection(model_name: String) -> Result<(), String> {
     let mut settings = config::load_settings();
     settings.whisper.model_name = model_name;
     config::save_settings(&settings)
+}
+
+#[tauri::command]
+fn save_llm_settings(enabled: bool, ollama_url: String, model_name: String) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.llm.enabled = enabled;
+    settings.llm.ollama_url = ollama_url;
+    settings.llm.model_name = model_name;
+    config::save_settings(&settings)
+}
+
+#[tauri::command]
+async fn check_ollama_status(ollama_url: String) -> Result<bool, String> {
+    let client = OllamaClient::new(&ollama_url, "");
+    Ok(client.is_available().await)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -441,6 +495,8 @@ pub fn run() {
             toggle_recording,
             get_settings,
             save_model_selection,
+            save_llm_settings,
+            check_ollama_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
