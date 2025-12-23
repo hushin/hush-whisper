@@ -1,3 +1,3 @@
 pub mod handler;
 
-pub use handler::ShortcutHandler;
+pub use handler::{parse_shortcut, ShortcutHandler};

@@ -8,6 +8,12 @@ pub struct Settings {
     pub whisper: WhisperSettings,
     #[serde(default)]
     pub llm: LlmSettings,
+    /// Output mode for transcription results
+    #[serde(default)]
+    pub output_mode: OutputMode,
+    /// Shortcut key settings
+    #[serde(default)]
+    pub shortcut: ShortcutSettings,
     /// Whether settings were loaded from a saved file (not defaults)
     #[serde(skip_deserializing, default)]
     pub is_saved: bool,
@@ -16,6 +22,38 @@ pub struct Settings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhisperSettings {
     pub model_name: String,
+}
+
+/// Shortcut settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShortcutSettings {
+    /// The shortcut key combination (e.g., "Ctrl+Space", "Alt+R")
+    pub recording_toggle: String,
+}
+
+impl Default for ShortcutSettings {
+    fn default() -> Self {
+        Self {
+            recording_toggle: "Ctrl+Space".to_string(),
+        }
+    }
+}
+
+/// Output mode for transcription results
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum OutputMode {
+    /// Copy to clipboard only (no paste)
+    ClipboardOnly,
+    /// Paste directly (temporary clipboard, restore after)
+    DirectInput,
+    /// Copy to clipboard and paste (current behavior)
+    Both,
+}
+
+impl Default for OutputMode {
+    fn default() -> Self {
+        Self::DirectInput
+    }
 }
 
 /// Available prompt presets
@@ -138,6 +176,8 @@ impl Default for Settings {
                 model_name: "large-v3-turbo".to_string(),
             },
             llm: LlmSettings::default(),
+            output_mode: OutputMode::default(),
+            shortcut: ShortcutSettings::default(),
             is_saved: false,
         }
     }

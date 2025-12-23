@@ -20,6 +20,7 @@
   }
 
   type PromptPreset = "Default" | "Meeting" | "Memo" | "Chat" | "Custom";
+  type OutputMode = "ClipboardOnly" | "DirectInput" | "Both";
 
   interface LlmSettings {
     enabled: boolean;
@@ -29,14 +30,21 @@
     custom_prompt: string;
   }
 
+  interface ShortcutSettings {
+    recording_toggle: string;
+  }
+
   interface Settings {
     whisper: WhisperSettings;
     llm: LlmSettings;
+    output_mode: OutputMode;
+    shortcut: ShortcutSettings;
     is_saved: boolean;
   }
 
   let availableModels = $state<ModelInfo[]>([]);
   let selectedModel = $state("large-v3-turbo");
+  let currentLoadedModel = $state<string | null>(null);
   let isModelInitialized = $state(false);
   let isRecording = $state(false);
   let isTranscribing = $state(false);
@@ -68,6 +76,22 @@
     Custom: "カスタムプロンプト",
   };
 
+  // Output mode settings
+  let outputMode = $state<OutputMode>("DirectInput");
+
+  const outputModeDescriptions: Record<OutputMode, string> = {
+    ClipboardOnly: "クリップボードにコピーのみ",
+    DirectInput: "直接入力（クリップボード保持しない）",
+    Both: "コピー + 直接入力",
+  };
+
+  // Shortcut settings
+  let shortcutKey = $state("Ctrl+Space");
+  let isEditingShortcut = $state(false);
+  let shortcutError = $state("");
+  let pendingShortcut = $state("");
+  let shortcutChanged = $state(false);
+
   // Log viewer
   interface LogEntry {
     id: string;
@@ -83,6 +107,7 @@
   let logEntries = $state<LogEntry[]>([]);
   let isLoadingLogs = $state(false);
   let selectedLogEntry = $state<LogEntry | null>(null);
+  let logsNeedRefresh = $state(false);
 
   function formatBytes(bytes: number): string {
     if (bytes === 0) return "0 B";
@@ -109,12 +134,98 @@
       llmModelName = settings.llm.model_name;
       promptPreset = settings.llm.preset || "Default";
       customPrompt = settings.llm.custom_prompt || "";
-      console.log("Loaded settings, model:", selectedModel, "llm:", settings.llm, "is_saved:", settings.is_saved);
+      outputMode = settings.output_mode || "Both";
+      shortcutKey = settings.shortcut?.recording_toggle || "Ctrl+Space";
+      console.log("Loaded settings, model:", selectedModel, "llm:", settings.llm, "output_mode:", outputMode, "shortcut:", shortcutKey, "is_saved:", settings.is_saved);
       return settings.is_saved;
     } catch (error) {
       console.error("Failed to load settings:", error);
       return false;
     }
+  }
+
+  async function saveOutputMode() {
+    try {
+      await invoke("save_output_mode", { mode: outputMode });
+      console.log("Saved output mode:", outputMode);
+    } catch (error) {
+      console.error("Failed to save output mode:", error);
+    }
+  }
+
+  async function saveShortcut() {
+    if (!pendingShortcut) {
+      shortcutError = "キーを入力してください";
+      return;
+    }
+    try {
+      shortcutError = "";
+      await invoke("save_shortcut_setting", { shortcut: pendingShortcut });
+      shortcutKey = pendingShortcut;
+      isEditingShortcut = false;
+      pendingShortcut = "";
+      shortcutChanged = true;
+      console.log("Saved shortcut:", shortcutKey);
+    } catch (error) {
+      shortcutError = String(error);
+      console.error("Failed to save shortcut:", error);
+    }
+  }
+
+  function cancelShortcutEdit() {
+    shortcutError = "";
+    pendingShortcut = "";
+    isEditingShortcut = false;
+  }
+
+  function startShortcutEdit() {
+    pendingShortcut = "";
+    shortcutError = "";
+    shortcutChanged = false;
+    isEditingShortcut = true;
+  }
+
+  function handleShortcutKeyDown(event: KeyboardEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Ignore modifier-only keys
+    if (["Control", "Shift", "Alt", "Meta"].includes(event.key)) {
+      return;
+    }
+
+    const parts: string[] = [];
+
+    if (event.ctrlKey) parts.push("Ctrl");
+    if (event.altKey) parts.push("Alt");
+    if (event.shiftKey) parts.push("Shift");
+    if (event.metaKey) parts.push("Win");
+
+    // Use event.code to get the physical key (avoids Shift+1 becoming "!")
+    const code = event.code;
+    let key: string;
+
+    if (code === "Space") {
+      key = "Space";
+    } else if (code.startsWith("Key")) {
+      key = code.slice(3); // KeyA -> A
+    } else if (code.startsWith("Digit")) {
+      key = code.slice(5); // Digit1 -> 1
+    } else if (code.startsWith("Arrow")) {
+      key = code.slice(5); // ArrowUp -> Up
+    } else if (code.startsWith("F") && /^F\d+$/.test(code)) {
+      key = code; // F1, F2, etc.
+    } else if (code === "Backspace" || code === "Delete" || code === "Insert" ||
+               code === "Home" || code === "End" || code === "PageUp" || code === "PageDown" ||
+               code === "Enter" || code === "Tab" || code === "Escape") {
+      key = code;
+    } else {
+      // For other keys, use the code directly
+      key = code;
+    }
+
+    parts.push(key);
+    pendingShortcut = parts.join("+");
   }
 
   async function loadPresetPrompts() {
@@ -220,8 +331,9 @@
 
   function toggleLogViewer() {
     showLogViewer = !showLogViewer;
-    if (showLogViewer && logEntries.length === 0) {
+    if (showLogViewer && (logEntries.length === 0 || logsNeedRefresh)) {
       loadRecentLogs();
+      logsNeedRefresh = false;
     }
   }
 
@@ -248,6 +360,7 @@
 
       await invoke("initialize_whisper", { modelName: selectedModel });
       isModelInitialized = true;
+      currentLoadedModel = selectedModel;
       isDownloading = false;
       downloadProgress = null;
       statusMessage = "準備完了 - Ctrl+Space で録音開始/停止";
@@ -333,11 +446,18 @@
 
     const unlistenTranscriptionComplete = listen<string>(
       "transcription-complete",
-      (event) => {
+      async (event) => {
         isTranscribing = false;
         transcriptionResult = event.payload;
         statusMessage = "認識完了 - クリップボードにコピーしました";
         console.log("Transcription complete:", event.payload);
+
+        // Auto-refresh logs
+        if (showLogViewer) {
+          await loadRecentLogs();
+        } else {
+          logsNeedRefresh = true;
+        }
       }
     );
 
@@ -388,7 +508,7 @@
     <div class="model-setup">
       <select
         bind:value={selectedModel}
-        disabled={isModelInitialized || isDownloading}
+        disabled={isDownloading}
         class="model-select"
       >
         {#each availableModels as model}
@@ -399,13 +519,15 @@
       </select>
       <button
         onclick={initializeWhisper}
-        disabled={isModelInitialized || isDownloading}
+        disabled={isDownloading || (isModelInitialized && selectedModel === currentLoadedModel)}
         class="init-button"
       >
         {#if isDownloading}
           ダウンロード中...
+        {:else if isModelInitialized && selectedModel === currentLoadedModel}
+          読み込み済み
         {:else if isModelInitialized}
-          初期化済み
+          モデルを切り替える
         {:else}
           モデルを読み込む
         {/if}
@@ -542,6 +664,54 @@
   </div>
 
   <div class="section">
+    <h2>出力設定</h2>
+    <div class="input-group">
+      <label for="output-mode">出力モード</label>
+      <select
+        id="output-mode"
+        bind:value={outputMode}
+        onchange={saveOutputMode}
+        class="output-mode-select"
+      >
+        {#each Object.entries(outputModeDescriptions) as [value, label]}
+          <option {value}>{label}</option>
+        {/each}
+      </select>
+    </div>
+    <p class="output-mode-hint">
+      認識結果の出力方法を選択します。
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>ショートカット設定</h2>
+    <div class="shortcut-setting">
+      <span class="shortcut-label">録音開始/停止: </span>
+      {#if isEditingShortcut}
+        <input
+          type="text"
+          readonly
+          value={pendingShortcut || "キーを押してください..."}
+          class="shortcut-input"
+          class:placeholder={!pendingShortcut}
+          onkeydown={handleShortcutKeyDown}
+        />
+        <button class="shortcut-save-button" onclick={saveShortcut} disabled={!pendingShortcut}>保存</button>
+        <button class="shortcut-cancel-button" onclick={cancelShortcutEdit}>キャンセル</button>
+      {:else}
+        <kbd>{shortcutKey}</kbd>
+        <button class="shortcut-edit-button" onclick={startShortcutEdit}>変更</button>
+      {/if}
+    </div>
+    {#if shortcutError}
+      <p class="shortcut-error">{shortcutError}</p>
+    {/if}
+    {#if shortcutChanged}
+      <p class="shortcut-notice">ショートカットを変更しました。</p>
+    {/if}
+  </div>
+
+  <div class="section">
     <h2>録音</h2>
     <div class="recording-controls">
       <button
@@ -556,7 +726,6 @@
           ● 録音開始
         {/if}
       </button>
-      <p class="shortcut-hint">グローバルショートカット: <kbd>Ctrl+Space</kbd></p>
     </div>
   </div>
 
@@ -733,7 +902,8 @@
   }
 
   .model-hint,
-  .llm-hint {
+  .llm-hint,
+  .output-mode-hint {
     margin-top: 0.75rem;
     font-size: 0.85rem;
     color: #666;
@@ -834,7 +1004,8 @@
     border-color: #396cd8;
   }
 
-  .preset-select {
+  .preset-select,
+  .output-mode-select {
     width: 100%;
     padding: 0.6rem 0.75rem;
     border: 2px solid #ddd;
@@ -844,7 +1015,8 @@
     cursor: pointer;
   }
 
-  .preset-select:focus {
+  .preset-select:focus,
+  .output-mode-select:focus {
     outline: none;
     border-color: #396cd8;
   }
@@ -1052,10 +1224,73 @@
     }
   }
 
-  .shortcut-hint {
-    margin-top: 1rem;
+  .shortcut-setting {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .shortcut-label {
     color: #666;
     font-size: 0.9rem;
+  }
+
+  .shortcut-input {
+    padding: 0.3rem 0.5rem;
+    border: 2px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    width: 180px;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  .shortcut-input:focus {
+    outline: none;
+    border-color: #396cd8;
+  }
+
+  .shortcut-input.placeholder {
+    color: #999;
+    font-style: italic;
+  }
+
+  .shortcut-edit-button,
+  .shortcut-save-button,
+  .shortcut-cancel-button {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    min-width: auto;
+  }
+
+  .shortcut-edit-button {
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+  }
+
+  .shortcut-save-button {
+    background-color: #4caf50;
+    color: white;
+  }
+
+  .shortcut-cancel-button {
+    background-color: #f0f0f0;
+    color: #333;
+    border: 1px solid #ddd;
+  }
+
+  .shortcut-error {
+    color: #f44336;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+  }
+
+  .shortcut-notice {
+    color: #ff9800;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
   }
 
   kbd {
@@ -1323,6 +1558,31 @@
       color: #f6f6f6;
     }
 
+    .shortcut-label {
+      color: #aaa;
+    }
+
+    .shortcut-input {
+      background-color: #1a1a1a;
+      color: #f6f6f6;
+      border-color: #444;
+    }
+
+    .shortcut-input.placeholder {
+      color: #666;
+    }
+
+    .shortcut-edit-button,
+    .shortcut-cancel-button {
+      background-color: #333;
+      color: #f6f6f6;
+      border-color: #555;
+    }
+
+    .shortcut-notice {
+      color: #ffb74d;
+    }
+
     .llm-hint {
       color: #888;
     }
@@ -1342,7 +1602,8 @@
       border-color: #444;
     }
 
-    .preset-select {
+    .preset-select,
+    .output-mode-select {
       background-color: #1a1a1a;
       color: #f6f6f6;
       border-color: #444;

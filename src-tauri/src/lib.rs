@@ -69,6 +69,7 @@ pub struct AppState {
     clipboard: Mutex<Option<ClipboardManager>>,
     vad: Mutex<Option<VadProcessor>>,
     is_recording: Mutex<bool>,
+    current_shortcut: Mutex<String>,
 }
 
 // Manual Send/Sync implementation
@@ -78,6 +79,7 @@ unsafe impl Sync for AppState {}
 
 impl AppState {
     fn new() -> Self {
+        let settings = config::load_settings();
         Self {
             audio_capture: Mutex::new(None),
             active_stream: Mutex::new(None),
@@ -85,6 +87,7 @@ impl AppState {
             clipboard: Mutex::new(None),
             vad: Mutex::new(None),
             is_recording: Mutex::new(false),
+            current_shortcut: Mutex::new(settings.shortcut.recording_toggle),
         }
     }
 }
@@ -186,6 +189,18 @@ async fn initialize_whisper(
     model_name: String,
 ) -> Result<String, String> {
     tracing::info!("Initializing Whisper with model: {}", model_name);
+
+    // First, unload existing model if any (to release VRAM)
+    {
+        let mut whisper_guard = state.whisper.lock().unwrap();
+        if whisper_guard.is_some() {
+            tracing::info!("Unloading previous model to free VRAM");
+            *whisper_guard = None;
+            // Give CUDA time to clean up
+            drop(whisper_guard);
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+    }
 
     // Get model info
     let model_url = get_model_url(&model_name)
@@ -415,8 +430,8 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
 
         let clipboard = clipboard_guard.as_mut().unwrap();
         clipboard
-            .set_and_paste(&final_text)
-            .map_err(|e| format!("Failed to paste text: {}", e))?;
+            .output_text(&final_text, &settings.output_mode)
+            .map_err(|e| format!("Failed to output text: {}", e))?;
     }
 
     // Notify frontend with result
@@ -489,6 +504,57 @@ fn get_preset_prompts() -> Vec<(String, String)> {
 }
 
 #[tauri::command]
+fn save_output_mode(mode: String) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.output_mode = match mode.as_str() {
+        "ClipboardOnly" => config::OutputMode::ClipboardOnly,
+        "DirectInput" => config::OutputMode::DirectInput,
+        "Both" => config::OutputMode::Both,
+        _ => return Err(format!("Invalid output mode: {}", mode)),
+    };
+    config::save_settings(&settings)
+}
+
+#[tauri::command]
+fn get_shortcut_setting() -> String {
+    let settings = config::load_settings();
+    settings.shortcut.recording_toggle
+}
+
+#[tauri::command]
+fn save_shortcut_setting(app: AppHandle, state: State<'_, AppState>, shortcut: String) -> Result<(), String> {
+    // Validate shortcut first
+    shortcuts::parse_shortcut(&shortcut)
+        .map_err(|e| format!("Invalid shortcut: {}", e))?;
+
+    // Get current shortcut
+    let current = state.current_shortcut.lock().unwrap().clone();
+
+    // Create toggle callback
+    let toggle_callback = Arc::new(|app_handle: &AppHandle| {
+        let app_clone = app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            let state: State<AppState> = app_clone.state();
+            if let Err(e) = toggle_recording(state, app_clone.clone()).await {
+                tracing::error!("Failed to toggle recording: {}", e);
+            }
+        });
+    });
+
+    // Update shortcut registration
+    ShortcutHandler::update_shortcut(&app, &current, &shortcut, toggle_callback)
+        .map_err(|e| e.to_string())?;
+
+    // Update state
+    *state.current_shortcut.lock().unwrap() = shortcut.clone();
+
+    // Save to config
+    let mut settings = config::load_settings();
+    settings.shortcut.recording_toggle = shortcut;
+    config::save_settings(&settings)
+}
+
+#[tauri::command]
 async fn check_ollama_status(ollama_url: String) -> Result<bool, String> {
     let client = OllamaClient::new(&ollama_url, "");
     Ok(client.is_available().await)
@@ -530,6 +596,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
+            // Load shortcut from settings
+            let settings = config::load_settings();
+            let shortcut_str = settings.shortcut.recording_toggle.clone();
+
             // Create toggle callback
             let toggle_callback = Arc::new(|app_handle: &AppHandle| {
                 let app_clone = app_handle.clone();
@@ -541,9 +611,22 @@ pub fn run() {
                 });
             });
 
-            // Register global shortcut with callback
-            if let Err(e) = ShortcutHandler::register(app.handle(), toggle_callback) {
-                tracing::error!("Failed to register global shortcut: {}", e);
+            // Register global shortcut with callback (using saved shortcut or default)
+            if let Err(e) = ShortcutHandler::register_with_shortcut(app.handle(), &shortcut_str, toggle_callback) {
+                tracing::error!("Failed to register global shortcut '{}': {}", shortcut_str, e);
+                // Fallback to default shortcut
+                let fallback_callback = Arc::new(|app_handle: &AppHandle| {
+                    let app_clone = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let state: State<AppState> = app_clone.state();
+                        if let Err(e) = toggle_recording(state, app_clone.clone()).await {
+                            tracing::error!("Failed to toggle recording: {}", e);
+                        }
+                    });
+                });
+                if let Err(e2) = ShortcutHandler::register(app.handle(), fallback_callback) {
+                    tracing::error!("Failed to register fallback shortcut: {}", e2);
+                }
             }
 
             // Setup system tray
@@ -551,7 +634,7 @@ pub fn run() {
             if let Err(e) = tray_manager.setup(app.handle()) {
                 tracing::error!("Failed to setup system tray: {}", e);
             }
-            tracing::info!("Setup complete - tray and shortcuts registered");
+            tracing::info!("Setup complete - tray and shortcuts registered (shortcut: {})", shortcut_str);
 
             Ok(())
         })
@@ -576,6 +659,9 @@ pub fn run() {
             save_llm_settings,
             save_prompt_settings,
             get_preset_prompts,
+            save_output_mode,
+            get_shortcut_setting,
+            save_shortcut_setting,
             check_ollama_status,
             get_recent_logs,
             get_logs_for_date,
