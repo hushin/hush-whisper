@@ -107,11 +107,6 @@ impl LogManager {
         Ok(entry)
     }
 
-    /// Get all log entries for today
-    pub fn get_today_logs(&self) -> Vec<LogEntry> {
-        self.load_logs_for_date(&Utc::now())
-    }
-
     /// Get all log entries for a specific date
     pub fn get_logs_for_date(&self, year: i32, month: u32, day: u32) -> Vec<LogEntry> {
         use chrono::NaiveDate;

@@ -21,14 +21,6 @@ struct GenerateResponse {
     done: bool,
 }
 
-const DEFAULT_PROMPT_TEMPLATE: &str = r#"以下の音声認識結果を自然な日本語に整形してください。
-誤字脱字の修正、句読点の追加、文法の修正を行ってください。
-整形後のテキストのみを出力してください。余計な説明は不要です。
-
-入力: {input}
-
-出力:"#;
-
 impl OllamaClient {
     /// Create a new Ollama client
     pub fn new(base_url: &str, model: &str) -> Self {
@@ -43,12 +35,6 @@ impl OllamaClient {
     #[allow(dead_code)]
     pub fn default() -> Self {
         Self::new("http://localhost:11434", "gpt-oss:20b")
-    }
-
-    /// Refine transcribed text using LLM
-    pub async fn refine_text(&self, raw_text: &str) -> Result<String, String> {
-        self.refine_text_with_prompt(raw_text, DEFAULT_PROMPT_TEMPLATE)
-            .await
     }
 
     /// Refine transcribed text using LLM with custom prompt template
