@@ -30,7 +30,7 @@ docs/            # Implementation details (read as needed)
 # Development
 pnpm tauri dev
 
-# Build
+# Build (use this for build check)
 pnpm tauri build
 
 # Test Rust
@@ -41,6 +41,8 @@ cargo fmt --manifest-path src-tauri/Cargo.toml
 cargo clippy --manifest-path src-tauri/Cargo.toml
 pnpm lint
 ```
+
+**Note**: ビルドチェックには `pnpm tauri build` を使用すること。`cargo check` は依存関係の問題で失敗する場合がある。
 
 ## Key Constraints
 
