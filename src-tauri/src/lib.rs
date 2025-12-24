@@ -345,11 +345,12 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
         app.emit("transcription-started", ())
             .map_err(|e| format!("Failed to emit event: {}", e))?;
 
+        let whisper_settings = config::load_settings().whisper;
         let whisper_guard = state.whisper.lock().unwrap();
         let transcribed = if let Some(whisper) = whisper_guard.as_ref() {
             // Use Whisper for transcription
             whisper
-                .transcribe(&speech_data)
+                .transcribe_with_options(&speech_data, whisper_settings.insert_newline)
                 .map_err(|e| format!("Failed to transcribe: {}", e))?
         } else {
             // Fallback to dummy mode if Whisper not initialized
@@ -466,6 +467,13 @@ fn get_settings() -> config::Settings {
 fn save_model_selection(model_name: String) -> Result<(), String> {
     let mut settings = config::load_settings();
     settings.whisper.model_name = model_name;
+    config::save_settings(&settings)
+}
+
+#[tauri::command]
+fn save_whisper_insert_newline(insert_newline: bool) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.whisper.insert_newline = insert_newline;
     config::save_settings(&settings)
 }
 
@@ -656,6 +664,7 @@ pub fn run() {
             toggle_recording,
             get_settings,
             save_model_selection,
+            save_whisper_insert_newline,
             save_llm_settings,
             save_prompt_settings,
             get_preset_prompts,

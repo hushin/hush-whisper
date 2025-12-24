@@ -17,6 +17,7 @@
 
   interface WhisperSettings {
     model_name: string;
+    insert_newline: boolean;
   }
 
   type PromptPreset = "Default" | "Meeting" | "Memo" | "Chat" | "Custom";
@@ -44,6 +45,7 @@
 
   let availableModels = $state<ModelInfo[]>([]);
   let selectedModel = $state("large-v3-turbo");
+  let insertNewline = $state(true);
   let currentLoadedModel = $state<string | null>(null);
   let isModelInitialized = $state(false);
   let isRecording = $state(false);
@@ -129,6 +131,7 @@
     try {
       const settings: Settings = await invoke("get_settings");
       selectedModel = settings.whisper.model_name;
+      insertNewline = settings.whisper.insert_newline ?? true;
       llmEnabled = settings.llm.enabled;
       llmOllamaUrl = settings.llm.ollama_url;
       llmModelName = settings.llm.model_name;
@@ -150,6 +153,15 @@
       console.log("Saved output mode:", outputMode);
     } catch (error) {
       console.error("Failed to save output mode:", error);
+    }
+  }
+
+  async function saveInsertNewline() {
+    try {
+      await invoke("save_whisper_insert_newline", { insertNewline });
+      console.log("Saved insert newline:", insertNewline);
+    } catch (error) {
+      console.error("Failed to save insert newline:", error);
     }
   }
 
@@ -552,6 +564,18 @@
     <p class="model-hint">
       モデルが存在しない場合は自動的にダウンロードされます
     </p>
+
+    <div class="whisper-toggle">
+      <label class="switch">
+        <input
+          type="checkbox"
+          bind:checked={insertNewline}
+          onchange={saveInsertNewline}
+        />
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label">セグメント間に改行を入れる</span>
+    </div>
   </div>
 
   <div class="section">
@@ -907,6 +931,14 @@
     margin-top: 0.75rem;
     font-size: 0.85rem;
     color: #666;
+  }
+
+  /* Whisper Settings Styles */
+  .whisper-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
   }
 
   /* LLM Settings Styles */

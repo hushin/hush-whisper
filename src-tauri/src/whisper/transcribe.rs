@@ -24,6 +24,14 @@ impl WhisperTranscriber {
     }
 
     pub fn transcribe(&self, audio_data: &[f32]) -> Result<String, Box<dyn std::error::Error>> {
+        self.transcribe_with_options(audio_data, true)
+    }
+
+    pub fn transcribe_with_options(
+        &self,
+        audio_data: &[f32],
+        insert_newline: bool,
+    ) -> Result<String, Box<dyn std::error::Error>> {
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
 
         // Japanese language setting
@@ -42,13 +50,14 @@ impl WhisperTranscriber {
         let num_segments = state.full_n_segments();
         tracing::info!("Transcription complete. Segments: {}", num_segments);
 
+        let separator = if insert_newline { "\n" } else { "" };
         let mut result = String::new();
         for i in 0..num_segments {
             if let Some(segment) = state.get_segment(i) {
                 // Use to_str_lossy to handle any encoding issues gracefully
                 if let Ok(text) = segment.to_str_lossy() {
                     if !result.is_empty() {
-                        result.push('\n');
+                        result.push_str(separator);
                     }
                     result.push_str(&text);
                 }

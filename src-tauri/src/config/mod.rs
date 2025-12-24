@@ -22,6 +22,13 @@ pub struct Settings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WhisperSettings {
     pub model_name: String,
+    /// Whether to insert newlines between segments
+    #[serde(default = "default_insert_newline")]
+    pub insert_newline: bool,
+}
+
+fn default_insert_newline() -> bool {
+    true
 }
 
 /// Shortcut settings
@@ -174,6 +181,7 @@ impl Default for Settings {
         Self {
             whisper: WhisperSettings {
                 model_name: "large-v3-turbo".to_string(),
+                insert_newline: true,
             },
             llm: LlmSettings::default(),
             output_mode: OutputMode::default(),
