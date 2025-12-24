@@ -70,6 +70,8 @@ pub struct AppState {
     vad: Mutex<Option<VadProcessor>>,
     is_recording: Mutex<bool>,
     current_shortcut: Mutex<String>,
+    /// Handle for the auto-stop timer task
+    auto_stop_handle: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 // Manual Send/Sync implementation
@@ -88,6 +90,7 @@ impl AppState {
             vad: Mutex::new(None),
             is_recording: Mutex::new(false),
             current_shortcut: Mutex::new(settings.shortcut.recording_toggle),
+            auto_stop_handle: Mutex::new(None),
         }
     }
 }
@@ -260,6 +263,31 @@ async fn start_recording(state: State<'_, AppState>, app: AppHandle) -> Result<S
     *state.active_stream.lock().unwrap() = Some(stream);
 
     *is_recording = true;
+    drop(is_recording);
+    drop(audio_capture_guard);
+
+    // Get max recording time from settings
+    let settings = config::load_settings();
+    let max_seconds = settings.whisper.max_recording_seconds;
+
+    // Start auto-stop timer
+    if max_seconds > 0 {
+        let app_clone = app.clone();
+        let handle = tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(max_seconds as u64)).await;
+            tracing::info!("Auto-stop timer triggered after {} seconds", max_seconds);
+            let state: State<AppState> = app_clone.state();
+            // Check if still recording before auto-stopping
+            if *state.is_recording.lock().unwrap() {
+                let _ = app_clone.emit("recording-auto-stopped", ());
+                let app_for_stop = app_clone.clone();
+                if let Err(e) = stop_recording(state, app_for_stop).await {
+                    tracing::error!("Failed to auto-stop recording: {}", e);
+                }
+            }
+        });
+        *state.auto_stop_handle.lock().unwrap() = Some(handle);
+    }
 
     // Notify frontend
     app.emit("recording-started", ())
@@ -270,6 +298,15 @@ async fn start_recording(state: State<'_, AppState>, app: AppHandle) -> Result<S
 
 #[tauri::command]
 async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<String, String> {
+    // Cancel auto-stop timer if running
+    {
+        let mut handle_guard = state.auto_stop_handle.lock().unwrap();
+        if let Some(handle) = handle_guard.take() {
+            handle.abort();
+            tracing::info!("Auto-stop timer cancelled");
+        }
+    }
+
     // Phase 1: Gather all data while holding locks, then release them before any await
     let text = {
         let mut is_recording = state.is_recording.lock().unwrap();
@@ -478,6 +515,13 @@ fn save_whisper_insert_newline(insert_newline: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn save_max_recording_seconds(max_seconds: u32) -> Result<(), String> {
+    let mut settings = config::load_settings();
+    settings.whisper.max_recording_seconds = max_seconds;
+    config::save_settings(&settings)
+}
+
+#[tauri::command]
 fn save_llm_settings(enabled: bool, ollama_url: String, model_name: String) -> Result<(), String> {
     let mut settings = config::load_settings();
     settings.llm.enabled = enabled;
@@ -665,6 +709,7 @@ pub fn run() {
             get_settings,
             save_model_selection,
             save_whisper_insert_newline,
+            save_max_recording_seconds,
             save_llm_settings,
             save_prompt_settings,
             get_preset_prompts,

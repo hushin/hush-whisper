@@ -18,6 +18,7 @@
   interface WhisperSettings {
     model_name: string;
     insert_newline: boolean;
+    max_recording_seconds: number;
   }
 
   type PromptPreset = "Default" | "Meeting" | "Memo" | "Chat" | "Custom";
@@ -46,6 +47,7 @@
   let availableModels = $state<ModelInfo[]>([]);
   let selectedModel = $state("large-v3-turbo");
   let insertNewline = $state(true);
+  let maxRecordingSeconds = $state(300);
   let currentLoadedModel = $state<string | null>(null);
   let isModelInitialized = $state(false);
   let isRecording = $state(false);
@@ -132,6 +134,7 @@
       const settings: Settings = await invoke("get_settings");
       selectedModel = settings.whisper.model_name;
       insertNewline = settings.whisper.insert_newline ?? true;
+      maxRecordingSeconds = settings.whisper.max_recording_seconds ?? 300;
       llmEnabled = settings.llm.enabled;
       llmOllamaUrl = settings.llm.ollama_url;
       llmModelName = settings.llm.model_name;
@@ -139,7 +142,7 @@
       customPrompt = settings.llm.custom_prompt || "";
       outputMode = settings.output_mode || "Both";
       shortcutKey = settings.shortcut?.recording_toggle || "Ctrl+Space";
-      console.log("Loaded settings, model:", selectedModel, "llm:", settings.llm, "output_mode:", outputMode, "shortcut:", shortcutKey, "is_saved:", settings.is_saved);
+      console.log("Loaded settings, model:", selectedModel, "llm:", settings.llm, "output_mode:", outputMode, "shortcut:", shortcutKey, "max_recording_seconds:", maxRecordingSeconds, "is_saved:", settings.is_saved);
       return settings.is_saved;
     } catch (error) {
       console.error("Failed to load settings:", error);
@@ -163,6 +166,23 @@
     } catch (error) {
       console.error("Failed to save insert newline:", error);
     }
+  }
+
+  async function saveMaxRecordingSeconds() {
+    try {
+      await invoke("save_max_recording_seconds", { maxSeconds: maxRecordingSeconds });
+      console.log("Saved max recording seconds:", maxRecordingSeconds);
+    } catch (error) {
+      console.error("Failed to save max recording seconds:", error);
+    }
+  }
+
+  function formatDuration(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (minutes === 0) return `${secs}秒`;
+    if (secs === 0) return `${minutes}分`;
+    return `${minutes}分${secs}秒`;
   }
 
   async function saveShortcut() {
@@ -477,6 +497,11 @@
       console.log("Recording toggle event received");
     });
 
+    const unlistenRecordingAutoStopped = listen("recording-auto-stopped", () => {
+      console.log("Recording auto-stopped due to max time limit");
+      statusMessage = "最大録音時間に達したため自動停止しました";
+    });
+
     // Listen for LLM events
     const unlistenLlmStarted = listen("llm-refinement-started", () => {
       isLlmRefining = true;
@@ -504,6 +529,7 @@
       unlistenTranscriptionStarted.then((fn) => fn());
       unlistenTranscriptionComplete.then((fn) => fn());
       unlistenRecordingToggle.then((fn) => fn());
+      unlistenRecordingAutoStopped.then((fn) => fn());
       unlistenLlmStarted.then((fn) => fn());
       unlistenLlmComplete.then((fn) => fn());
       unlistenLlmFailed.then((fn) => fn());
@@ -575,6 +601,29 @@
         <span class="slider"></span>
       </label>
       <span class="toggle-label">セグメント間に改行を入れる</span>
+    </div>
+
+    <div class="max-recording-setting">
+      <label for="max-recording">最大録音時間</label>
+      <div class="max-recording-input-row">
+        <select
+          id="max-recording"
+          bind:value={maxRecordingSeconds}
+          onchange={saveMaxRecordingSeconds}
+          class="max-recording-select"
+        >
+          <option value={60}>1分</option>
+          <option value={120}>2分</option>
+          <option value={180}>3分</option>
+          <option value={300}>5分 (デフォルト)</option>
+          <option value={600}>10分</option>
+          <option value={900}>15分</option>
+          <option value={0}>無制限</option>
+        </select>
+      </div>
+      <p class="max-recording-hint">
+        設定時間を超えると自動的に録音を停止します
+      </p>
     </div>
   </div>
 
@@ -927,10 +976,47 @@
 
   .model-hint,
   .llm-hint,
-  .output-mode-hint {
+  .output-mode-hint,
+  .max-recording-hint {
     margin-top: 0.75rem;
     font-size: 0.85rem;
     color: #666;
+  }
+
+  .max-recording-setting {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e0e0e0;
+  }
+
+  .max-recording-setting label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #555;
+  }
+
+  .max-recording-input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .max-recording-select {
+    flex: 1;
+    max-width: 200px;
+    padding: 0.6rem 0.75rem;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background-color: white;
+    cursor: pointer;
+  }
+
+  .max-recording-select:focus {
+    outline: none;
+    border-color: #396cd8;
   }
 
   /* Whisper Settings Styles */
@@ -1563,8 +1649,23 @@
       color: #666;
     }
 
-    .model-hint {
+    .model-hint,
+    .max-recording-hint {
       color: #888;
+    }
+
+    .max-recording-setting {
+      border-color: #444;
+    }
+
+    .max-recording-setting label {
+      color: #aaa;
+    }
+
+    .max-recording-select {
+      background-color: #1a1a1a;
+      color: #f6f6f6;
+      border-color: #444;
     }
 
     .progress-bar {

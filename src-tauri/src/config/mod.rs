@@ -25,10 +25,17 @@ pub struct WhisperSettings {
     /// Whether to insert newlines between segments
     #[serde(default = "default_insert_newline")]
     pub insert_newline: bool,
+    /// Maximum recording time in seconds (default: 300 = 5 minutes)
+    #[serde(default = "default_max_recording_seconds")]
+    pub max_recording_seconds: u32,
 }
 
 fn default_insert_newline() -> bool {
     true
+}
+
+fn default_max_recording_seconds() -> u32 {
+    300 // 5 minutes
 }
 
 /// Shortcut settings
@@ -182,6 +189,7 @@ impl Default for Settings {
             whisper: WhisperSettings {
                 model_name: "large-v3-turbo".to_string(),
                 insert_newline: true,
+                max_recording_seconds: 300,
             },
             llm: LlmSettings::default(),
             output_mode: OutputMode::default(),
