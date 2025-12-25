@@ -96,6 +96,10 @@
   let pendingShortcut = $state("");
   let shortcutChanged = $state(false);
 
+  // Autostart settings
+  let autostartEnabled = $state(false);
+  let isLoadingAutostart = $state(false);
+
   // Log viewer
   interface LogEntry {
     id: string;
@@ -215,6 +219,31 @@
     shortcutError = "";
     shortcutChanged = false;
     isEditingShortcut = true;
+  }
+
+  async function loadAutostart() {
+    try {
+      isLoadingAutostart = true;
+      autostartEnabled = await invoke("get_autostart_enabled");
+      console.log("Loaded autostart enabled:", autostartEnabled);
+    } catch (error) {
+      console.error("Failed to load autostart setting:", error);
+    } finally {
+      isLoadingAutostart = false;
+    }
+  }
+
+  async function toggleAutostart() {
+    try {
+      isLoadingAutostart = true;
+      await invoke("set_autostart_enabled", { enabled: !autostartEnabled });
+      autostartEnabled = !autostartEnabled;
+      console.log("Saved autostart enabled:", autostartEnabled);
+    } catch (error) {
+      console.error("Failed to save autostart setting:", error);
+    } finally {
+      isLoadingAutostart = false;
+    }
   }
 
   function handleShortcutKeyDown(event: KeyboardEvent) {
@@ -424,6 +453,7 @@
     (async () => {
       await loadModels();
       await loadPresetPrompts();
+      await loadAutostart();
       const hasSavedSettings = await loadSettings();
       if (hasSavedSettings) {
         console.log("Auto-initializing saved model:", selectedModel);
@@ -785,6 +815,25 @@
   </div>
 
   <div class="section">
+    <h2>スタートアップ設定</h2>
+    <div class="autostart-toggle">
+      <label class="switch">
+        <input
+          type="checkbox"
+          checked={autostartEnabled}
+          onchange={toggleAutostart}
+          disabled={isLoadingAutostart}
+        />
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label">Windows 起動時に自動起動</span>
+    </div>
+    <p class="autostart-hint">
+      有効にすると、Windows の起動時にアプリがバックグラウンドで起動します
+    </p>
+  </div>
+
+  <div class="section">
     <h2>録音</h2>
     <div class="recording-controls">
       <button
@@ -977,7 +1026,8 @@
   .model-hint,
   .llm-hint,
   .output-mode-hint,
-  .max-recording-hint {
+  .max-recording-hint,
+  .autostart-hint {
     margin-top: 0.75rem;
     font-size: 0.85rem;
     color: #666;
@@ -1033,6 +1083,13 @@
     align-items: center;
     gap: 0.75rem;
     margin-bottom: 1rem;
+  }
+
+  /* Autostart Settings Styles */
+  .autostart-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
   }
 
   .toggle-label {
@@ -1650,7 +1707,8 @@
     }
 
     .model-hint,
-    .max-recording-hint {
+    .max-recording-hint,
+    .autostart-hint {
       color: #888;
     }
 

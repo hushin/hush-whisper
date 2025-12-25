@@ -18,6 +18,7 @@ use futures_util::StreamExt;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
+use tauri_plugin_autostart::MacosLauncher;
 use tokio::io::AsyncWriteExt;
 
 /// Available Whisper models with their URLs and filenames
@@ -637,6 +638,24 @@ fn delete_log_entry(id: String) -> Result<bool, String> {
     log_manager.delete_entry(&id)
 }
 
+#[tauri::command]
+fn get_autostart_enabled(app: AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let autostart_manager = app.autolaunch();
+    autostart_manager.is_enabled().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_autostart_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let autostart_manager = app.autolaunch();
+    if enabled {
+        autostart_manager.enable().map_err(|e| e.to_string())
+    } else {
+        autostart_manager.disable().map_err(|e| e.to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Initialize tracing
@@ -647,6 +666,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ))
         .setup(|app| {
             // Load shortcut from settings
             let settings = config::load_settings();
@@ -721,6 +744,8 @@ pub fn run() {
             get_logs_for_date,
             get_available_log_dates,
             delete_log_entry,
+            get_autostart_enabled,
+            set_autostart_enabled,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

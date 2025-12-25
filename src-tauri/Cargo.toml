@@ -51,3 +51,6 @@ chrono = { version = "0.4", features = ["serde"] }
 # Image processing
 image = { version = "0.25", default-features = false, features = ["png"] }
 
+# Autostart
+tauri-plugin-autostart = "2"
+

@@ -61,7 +61,7 @@ Windows 向け SuperWhisper 風ローカル音声入力アプリ。
 
 #### Windows スタートアップ登録
 
-- [ ] Windows スタートアップ登録（自動起動）
+- [x] Windows スタートアップ登録（自動起動）
 
 ---
 
