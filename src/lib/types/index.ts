@@ -1,0 +1,92 @@
+// Category types
+export type CategoryId =
+  | "model"
+  | "recording-result"
+  | "shortcut-output"
+  | "llm"
+  | "general"
+  | "history";
+
+export interface Category {
+  id: CategoryId;
+  label: string;
+}
+
+export const categories: Category[] = [
+  { id: "model", label: "音声認識モデル" },
+  { id: "recording-result", label: "録音・結果" },
+  { id: "shortcut-output", label: "ショートカット・出力" },
+  { id: "llm", label: "LLM" },
+  { id: "general", label: "環境設定" },
+  { id: "history", label: "履歴" },
+];
+
+// Model types
+export interface DownloadProgress {
+  downloaded: number;
+  total: number;
+  percentage: number;
+}
+
+export interface ModelInfo {
+  name: string;
+  filename: string;
+  size_hint: string;
+}
+
+// Settings types
+export interface WhisperSettings {
+  model_name: string;
+  insert_newline: boolean;
+  max_recording_seconds: number;
+}
+
+export type PromptPreset = "Default" | "Meeting" | "Memo" | "Chat" | "Custom";
+
+export type OutputMode = "ClipboardOnly" | "DirectInput" | "Both";
+
+export interface LlmSettings {
+  enabled: boolean;
+  ollama_url: string;
+  model_name: string;
+  preset: PromptPreset;
+  custom_prompt: string;
+}
+
+export interface ShortcutSettings {
+  recording_toggle: string;
+}
+
+export interface Settings {
+  whisper: WhisperSettings;
+  llm: LlmSettings;
+  output_mode: OutputMode;
+  shortcut: ShortcutSettings;
+  is_saved: boolean;
+}
+
+// Log types
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  raw_text: string;
+  refined_text: string | null;
+  audio_duration_secs: number | null;
+  llm_used: boolean;
+  prompt_preset: string | null;
+}
+
+// Description types
+export const presetDescriptions: Record<PromptPreset, string> = {
+  Default: "自然な日本語に整形",
+  Meeting: "議事録形式で整理",
+  Memo: "簡潔なメモに要約",
+  Chat: "カジュアルなチャット文",
+  Custom: "カスタムプロンプト",
+};
+
+export const outputModeDescriptions: Record<OutputMode, string> = {
+  ClipboardOnly: "クリップボードにコピーのみ",
+  DirectInput: "直接入力（クリップボード保持しない）",
+  Both: "コピー + 直接入力",
+};

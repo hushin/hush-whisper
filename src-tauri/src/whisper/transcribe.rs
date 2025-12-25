@@ -23,10 +23,6 @@ impl WhisperTranscriber {
         Ok(Self { ctx })
     }
 
-    pub fn transcribe(&self, audio_data: &[f32]) -> Result<String, Box<dyn std::error::Error>> {
-        self.transcribe_with_options(audio_data, true)
-    }
-
     pub fn transcribe_with_options(
         &self,
         audio_data: &[f32],
