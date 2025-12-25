@@ -209,7 +209,7 @@ class SettingsStore {
       this.currentLoadedModel = this.selectedModel;
       this.isDownloading = false;
       this.downloadProgress = null;
-      this.statusMessage = "準備完了 - Ctrl+Space で録音開始/停止";
+      this.statusMessage = `準備完了 - ${this.shortcutKey} で録音開始/停止`;
 
       // Save the selected model for next time
       await this.saveModelSelection(this.selectedModel);

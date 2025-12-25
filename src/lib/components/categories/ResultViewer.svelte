@@ -1,7 +1,5 @@
 <script lang="ts">
-  import StatusBar from "$lib/components/StatusBar.svelte";
-  import ResultDisplay from "$lib/components/ResultDisplay.svelte";
+  import StatusAndResult from "$lib/components/StatusAndResult.svelte";
 </script>
 
-<StatusBar />
-<ResultDisplay />
+<StatusAndResult />

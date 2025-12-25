@@ -1,9 +1,7 @@
 <script lang="ts">
   import RecordingSettings from "./RecordingSettings.svelte";
-  import StatusBar from "$lib/components/StatusBar.svelte";
-  import ResultDisplay from "$lib/components/ResultDisplay.svelte";
+  import StatusAndResult from "$lib/components/StatusAndResult.svelte";
 </script>
 
 <RecordingSettings />
-<StatusBar />
-<ResultDisplay />
+<StatusAndResult />
