@@ -639,6 +639,12 @@ fn delete_log_entry(id: String) -> Result<bool, String> {
 }
 
 #[tauri::command]
+fn delete_all_logs() -> Result<usize, String> {
+    let log_manager = log::LogManager::new()?;
+    log_manager.delete_all_entries()
+}
+
+#[tauri::command]
 fn get_autostart_enabled(app: AppHandle) -> Result<bool, String> {
     use tauri_plugin_autostart::ManagerExt;
     let autostart_manager = app.autolaunch();
@@ -744,6 +750,7 @@ pub fn run() {
             get_logs_for_date,
             get_available_log_dates,
             delete_log_entry,
+            delete_all_logs,
             get_autostart_enabled,
             set_autostart_enabled,
         ])

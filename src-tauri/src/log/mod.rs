@@ -212,6 +212,35 @@ impl LogManager {
         dates.sort_by(|a, b| b.cmp(a)); // Sort descending (newest first)
         dates
     }
+
+    /// Delete all log entries
+    pub fn delete_all_entries(&self) -> Result<usize, String> {
+        let mut deleted_count = 0;
+
+        // Get all log files
+        let log_files: Vec<PathBuf> = fs::read_dir(&self.log_dir)
+            .map(|entries| {
+                entries
+                    .filter_map(|e| e.ok())
+                    .map(|e| e.path())
+                    .filter(|p| p.extension().is_some_and(|ext| ext == "json"))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        // Delete each log file
+        for path in log_files {
+            if let Ok(content) = fs::read_to_string(&path) {
+                if let Ok(logs) = serde_json::from_str::<Vec<LogEntry>>(&content) {
+                    deleted_count += logs.len();
+                }
+            }
+            fs::remove_file(&path).map_err(|e| format!("Failed to delete log file: {}", e))?;
+        }
+
+        tracing::info!("Deleted all log entries: {} entries", deleted_count);
+        Ok(deleted_count)
+    }
 }
 
 impl Default for LogManager {

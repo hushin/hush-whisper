@@ -13,6 +13,24 @@
     });
   }
 
+  async function handleDeleteAll() {
+    if (settingsStore.logEntries.length === 0) {
+      return;
+    }
+
+    const confirmed = confirm(
+      `すべての履歴(${settingsStore.logEntries.length}件)を削除しますか?\nこの操作は元に戻せません。`
+    );
+
+    if (confirmed) {
+      try {
+        await settingsStore.deleteAllLogs();
+      } catch (error) {
+        alert("履歴の削除に失敗しました: " + error);
+      }
+    }
+  }
+
   onMount(() => {
     // 履歴カテゴリーが開かれたときに自動的にログを読み込む
     if (settingsStore.logEntries.length === 0) {
@@ -117,13 +135,22 @@
           </div>
         {/each}
       </div>
-      <button
-        class="refresh-button"
-        onclick={() => settingsStore.loadLogs()}
-        disabled={settingsStore.isLoadingLogs}
-      >
-        更新
-      </button>
+      <div class="button-row">
+        <button
+          class="refresh-button"
+          onclick={() => settingsStore.loadLogs()}
+          disabled={settingsStore.isLoadingLogs}
+        >
+          更新
+        </button>
+        <button
+          class="delete-all-button"
+          onclick={handleDeleteAll}
+          disabled={settingsStore.isLoadingLogs || settingsStore.logEntries.length === 0}
+        >
+          全削除
+        </button>
+      </div>
     {/if}
   </div>
 </div>
@@ -230,7 +257,7 @@
     flex-direction: column;
     gap: 0.75rem;
     margin-bottom: 1rem;
-    max-height: 500px;
+    max-height: 300px;
     overflow-y: auto;
   }
 
@@ -338,8 +365,13 @@
     word-wrap: break-word;
   }
 
+  .button-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
   .refresh-button {
-    width: 100%;
+    flex: 1;
     padding: 0.75rem;
     background-color: #f0f0f0;
     color: #333;
@@ -355,6 +387,28 @@
   }
 
   .refresh-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .delete-all-button {
+    flex: 1;
+    padding: 0.75rem;
+    background-color: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .delete-all-button:hover:not(:disabled) {
+    background-color: #d32f2f;
+  }
+
+  .delete-all-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
@@ -454,6 +508,14 @@
 
     .refresh-button:hover:not(:disabled) {
       background-color: #444;
+    }
+
+    .delete-all-button {
+      background-color: #d32f2f;
+    }
+
+    .delete-all-button:hover:not(:disabled) {
+      background-color: #b71c1c;
     }
   }
 </style>

@@ -395,6 +395,20 @@ class SettingsStore {
     }
   }
 
+  async deleteAllLogs() {
+    try {
+      const deletedCount: number = await invoke("delete_all_logs");
+      console.log("Deleted all logs:", deletedCount);
+      // Clear local state
+      this.logEntries = [];
+      this.selectedLogEntry = null;
+      return deletedCount;
+    } catch (error) {
+      console.error("Failed to delete all logs:", error);
+      throw error;
+    }
+  }
+
   selectLogEntry(entry: LogEntry | null) {
     this.selectedLogEntry = entry;
   }
