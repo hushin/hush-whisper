@@ -11,7 +11,7 @@ import type {
 
 class SettingsStore {
   // UI state
-  activeCategory = $state<CategoryId>("model");
+  activeCategory = $state<CategoryId>("speech-recognition");
 
   // Whisper settings
   availableModels = $state<ModelInfo[]>([]);

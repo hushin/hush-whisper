@@ -4,12 +4,11 @@
 
   import Sidebar from "$lib/components/Sidebar.svelte";
 
-  import ModelSettings from "$lib/components/categories/ModelSettings.svelte";
-  import RecordingAndResult from "$lib/components/categories/RecordingAndResult.svelte";
+  import SpeechRecognitionSettings from "$lib/components/categories/SpeechRecognitionSettings.svelte";
+  import ResultAndHistory from "$lib/components/categories/ResultAndHistory.svelte";
   import ShortcutAndOutput from "$lib/components/categories/ShortcutAndOutput.svelte";
   import LlmSettings from "$lib/components/categories/LlmSettings.svelte";
   import GeneralSettings from "$lib/components/categories/GeneralSettings.svelte";
-  import HistorySettings from "$lib/components/categories/HistorySettings.svelte";
 
   import { settingsStore } from "$lib/stores/settings.svelte";
   import type { DownloadProgress } from "$lib/types";
@@ -80,8 +79,8 @@
         settingsStore.statusMessage = "認識完了 - クリップボードにコピーしました";
         console.log("Transcription complete:", event.payload);
 
-        // Auto-refresh logs if history category is active
-        if (settingsStore.activeCategory === "history") {
+        // Auto-refresh logs if result-history category is active
+        if (settingsStore.activeCategory === "result-history") {
           await settingsStore.loadLogs();
         } else {
           settingsStore.logsNeedRefresh = true;
@@ -138,18 +137,16 @@
 
   <div class="main-area">
     <div class="category-content">
-      {#if settingsStore.activeCategory === "model"}
-        <ModelSettings />
-      {:else if settingsStore.activeCategory === "recording-result"}
-        <RecordingAndResult />
+      {#if settingsStore.activeCategory === "speech-recognition"}
+        <SpeechRecognitionSettings />
+      {:else if settingsStore.activeCategory === "result-history"}
+        <ResultAndHistory />
       {:else if settingsStore.activeCategory === "shortcut-output"}
         <ShortcutAndOutput />
       {:else if settingsStore.activeCategory === "llm"}
         <LlmSettings />
       {:else if settingsStore.activeCategory === "general"}
         <GeneralSettings />
-      {:else if settingsStore.activeCategory === "history"}
-        <HistorySettings />
       {/if}
     </div>
   </div>

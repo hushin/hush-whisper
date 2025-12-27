@@ -29,6 +29,19 @@
   </div>
 
   <div class="sidebar-status">
+    <button
+      class="record-button"
+      class:recording={settingsStore.isRecording}
+      onclick={() => settingsStore.toggleRecording()}
+      disabled={!settingsStore.isModelInitialized}
+      title={settingsStore.isRecording ? "録音停止" : "録音開始"}
+    >
+      {#if settingsStore.isRecording}
+        <span class="pulse">●</span>
+      {:else}
+        ●
+      {/if}
+    </button>
     <div class="status-indicator" class:recording={settingsStore.isRecording}>
       <span class="status-icon">{settingsStore.isRecording ? "●" : "○"}</span>
       <span class="status-text">
@@ -94,33 +107,56 @@
   .sidebar-status {
     padding: 1rem;
     border-top: 1px solid #e0e0e0;
-  }
-
-  .status-indicator {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.9rem;
-    color: #666;
-    transition: color 0.3s;
   }
 
-  .status-indicator.recording {
-    color: #f5576c;
-  }
-
-  .status-icon {
+  .record-button {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    padding: 0;
     font-size: 1rem;
-    display: inline-block;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
-  .status-indicator.recording .status-icon {
+  .record-button:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
+  }
+
+  .record-button:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  .record-button:disabled {
+    background: linear-gradient(135deg, #ccc 0%, #999 100%);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .record-button.recording {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  }
+
+  .pulse {
+    display: inline-block;
     animation: pulse 1.5s ease-in-out infinite;
   }
 
   @keyframes pulse {
-    0%,
-    100% {
+    0%, 100% {
       opacity: 1;
     }
     50% {
@@ -128,8 +164,34 @@
     }
   }
 
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #666;
+    transition: color 0.3s;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .status-indicator.recording {
+    color: #f5576c;
+  }
+
+  .status-icon {
+    font-size: 0.9rem;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .status-indicator.recording .status-icon {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
   .status-text {
     font-weight: 600;
+    white-space: nowrap;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -157,6 +219,22 @@
 
     .sidebar-status {
       border-top-color: #333;
+    }
+
+    .record-button {
+      background: linear-gradient(135deg, #90caf9 0%, #a58de3 100%);
+    }
+
+    .record-button:hover:not(:disabled) {
+      background: linear-gradient(135deg, #64b5f6 0%, #9575cd 100%);
+    }
+
+    .record-button:disabled {
+      background: linear-gradient(135deg, #666 0%, #444 100%);
+    }
+
+    .record-button.recording {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     }
 
     .status-indicator {

@@ -1,11 +1,10 @@
 // Category types
 export type CategoryId =
-  | "model"
-  | "recording-result"
-  | "shortcut-output"
-  | "llm"
-  | "general"
-  | "history";
+  | 'speech-recognition'
+  | 'result-history'
+  | 'shortcut-output'
+  | 'llm'
+  | 'general';
 
 export interface Category {
   id: CategoryId;
@@ -13,12 +12,11 @@ export interface Category {
 }
 
 export const categories: Category[] = [
-  { id: "model", label: "音声認識モデル" },
-  { id: "recording-result", label: "録音・結果" },
-  { id: "shortcut-output", label: "ショートカット・出力" },
-  { id: "llm", label: "LLM" },
-  { id: "general", label: "環境設定" },
-  { id: "history", label: "履歴" },
+  { id: 'speech-recognition', label: '音声認識' },
+  { id: 'shortcut-output', label: 'ショートカット・出力' },
+  { id: 'llm', label: 'LLM' },
+  { id: 'general', label: '環境設定' },
+  { id: 'result-history', label: '結果・履歴' },
 ];
 
 // Model types
@@ -41,9 +39,9 @@ export interface WhisperSettings {
   max_recording_seconds: number;
 }
 
-export type PromptPreset = "Default" | "Meeting" | "Memo" | "Chat" | "Custom";
+export type PromptPreset = 'Default' | 'Meeting' | 'Memo' | 'Chat' | 'Custom';
 
-export type OutputMode = "ClipboardOnly" | "DirectInput" | "Both";
+export type OutputMode = 'ClipboardOnly' | 'DirectInput' | 'Both';
 
 export interface LlmSettings {
   enabled: boolean;
@@ -78,15 +76,15 @@ export interface LogEntry {
 
 // Description types
 export const presetDescriptions: Record<PromptPreset, string> = {
-  Default: "自然な日本語に整形",
-  Meeting: "議事録形式で整理",
-  Memo: "簡潔なメモに要約",
-  Chat: "カジュアルなチャット文",
-  Custom: "カスタムプロンプト",
+  Default: '自然な日本語に整形',
+  Meeting: '議事録形式で整理',
+  Memo: '簡潔なメモに要約',
+  Chat: 'カジュアルなチャット文',
+  Custom: 'カスタムプロンプト',
 };
 
 export const outputModeDescriptions: Record<OutputMode, string> = {
-  ClipboardOnly: "クリップボードにコピーのみ",
-  DirectInput: "直接入力（クリップボード保持しない）",
-  Both: "コピー + 直接入力",
+  ClipboardOnly: 'クリップボードにコピーのみ',
+  DirectInput: '直接入力（クリップボード保持しない）',
+  Both: 'コピー + 直接入力',
 };
