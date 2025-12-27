@@ -1,0 +1,445 @@
+/* 設定画面の共通スタイル */
+
+/* セクション */
+.section {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.section h2 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.25rem;
+}
+
+/* フォーカススタイル */
+:focus {
+  outline: 2px solid #396cd8;
+  outline-offset: 2px;
+}
+
+/* トグルスイッチ */
+.toggle-label {
+  font-size: 0.95rem;
+  color: #333;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #396cd8;
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+/* 入力グループ */
+.input-group {
+  margin-bottom: 1.5rem;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.input-group input,
+.input-group select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  background-color: white;
+  color: #333;
+}
+
+.input-group input:disabled,
+.input-group select:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+/* ヒントテキスト */
+.hint-text {
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+/* ボタン共通スタイル */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: #396cd8;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #2c5ab8;
+}
+
+.btn-secondary {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #e0e0e0;
+}
+
+.btn-danger {
+  background-color: #f44336;
+  color: white;
+  font-weight: 600;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: #d32f2f;
+}
+
+/* 履歴関連 */
+.log-viewer {
+  margin-top: 1rem;
+}
+
+.loading,
+.no-logs {
+  text-align: center;
+  color: #666;
+  padding: 2rem;
+  font-style: italic;
+}
+
+.log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.log-entry {
+  padding: 1rem;
+  background-color: #f6f6f6;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.log-entry:hover {
+  background-color: #f0f0f0;
+  border-color: #ccc;
+}
+
+.log-entry.selected {
+  background-color: #e8f4ff;
+  border-color: #396cd8;
+}
+
+.log-entry:focus-visible {
+  outline: 2px solid #396cd8;
+  outline-offset: 2px;
+}
+
+.log-entry-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.log-timestamp {
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 600;
+}
+
+.log-badge {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 3px;
+}
+
+.log-badge.llm {
+  background-color: #667eea;
+  color: white;
+}
+
+.delete-button {
+  margin-left: auto;
+  padding: 0.2rem 0.5rem;
+  background-color: transparent;
+  color: #f44336;
+  border: none;
+  border-radius: 3px;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.delete-button:hover {
+  background-color: rgba(244, 67, 54, 0.1);
+}
+
+.log-text-preview {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.4;
+}
+
+.log-details {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #ddd;
+}
+
+.detail-row {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #666;
+}
+
+.detail-value {
+  font-size: 0.9rem;
+  color: #333;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.button-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.refresh-button {
+  flex: 1;
+  padding: 0.75rem;
+  background-color: #f0f0f0;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.refresh-button:hover:not(:disabled) {
+  background-color: #e0e0e0;
+}
+
+.refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.delete-all-button {
+  flex: 1;
+  padding: 0.75rem;
+  background-color: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.delete-all-button:hover:not(:disabled) {
+  background-color: #d32f2f;
+}
+
+.delete-all-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ダークモード対応 */
+@media (prefers-color-scheme: dark) {
+  .section {
+    background-color: #2a2a2a;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .section h2 {
+    color: #f6f6f6;
+  }
+
+  .toggle-label {
+    color: #f6f6f6;
+  }
+
+  .slider {
+    background-color: #555;
+  }
+
+  input:checked + .slider {
+    background-color: #90caf9;
+  }
+
+  .input-group label {
+    color: #f6f6f6;
+  }
+
+  .input-group input,
+  .input-group select {
+    background-color: #1a1a1a;
+    border-color: #444;
+    color: #f6f6f6;
+  }
+
+  .input-group input:disabled,
+  .input-group select:disabled {
+    background-color: #2a2a2a;
+  }
+
+  .hint-text {
+    color: #aaa;
+  }
+
+  .btn-secondary {
+    background-color: #333;
+    color: #f6f6f6;
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background-color: #444;
+  }
+
+  .btn-danger {
+    background-color: #d32f2f;
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background-color: #b71c1c;
+  }
+
+  .loading,
+  .no-logs {
+    color: #aaa;
+  }
+
+  .log-entry {
+    background-color: #1a1a1a;
+    border-color: #444;
+  }
+
+  .log-entry:hover {
+    background-color: #222;
+    border-color: #555;
+  }
+
+  .log-entry.selected {
+    background-color: #1a3a5c;
+    border-color: #90caf9;
+  }
+
+  .log-timestamp {
+    color: #aaa;
+  }
+
+  .log-text-preview {
+    color: #f6f6f6;
+  }
+
+  .log-details {
+    border-top-color: #444;
+  }
+
+  .detail-label {
+    color: #aaa;
+  }
+
+  .detail-value {
+    color: #f6f6f6;
+  }
+
+  .refresh-button {
+    background-color: #333;
+    color: #f6f6f6;
+  }
+
+  .refresh-button:hover:not(:disabled) {
+    background-color: #444;
+  }
+
+  .delete-all-button {
+    background-color: #d32f2f;
+  }
+
+  .delete-all-button:hover:not(:disabled) {
+    background-color: #b71c1c;
+  }
+}

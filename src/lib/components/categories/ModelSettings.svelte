@@ -62,6 +62,7 @@
 </div>
 
 <style>
+  /* コンポーネント固有のスタイル */
   .app-header {
     text-align: center;
     margin-bottom: 2rem;
@@ -79,20 +80,6 @@
     font-size: 1.1rem;
   }
 
-  .section {
-    background-color: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-
-  h2 {
-    margin: 0 0 1rem 0;
-    color: #333;
-    font-size: 1.25rem;
-  }
-
   .model-setup {
     display: flex;
     gap: 1rem;
@@ -107,11 +94,6 @@
     font-size: 0.95rem;
     background-color: white;
     cursor: pointer;
-  }
-
-  .model-select:focus {
-    outline: 2px solid #396cd8;
-    outline-offset: 2px;
   }
 
   .model-select:disabled {
@@ -179,15 +161,6 @@
 
     .app-subtitle {
       color: #aaa;
-    }
-
-    .section {
-      background-color: #2a2a2a;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    h2 {
-      color: #f6f6f6;
     }
 
     .model-select {

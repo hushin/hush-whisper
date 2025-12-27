@@ -41,20 +41,7 @@
 </div>
 
 <style>
-  .section {
-    background-color: white;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
-
-  h2 {
-    margin: 0 0 1rem 0;
-    color: #333;
-    font-size: 1.25rem;
-  }
-
+  /* コンポーネント固有のスタイル */
   .shortcut-setting {
     display: flex;
     align-items: center;
@@ -150,15 +137,6 @@
   }
 
   @media (prefers-color-scheme: dark) {
-    .section {
-      background-color: #2a2a2a;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    h2 {
-      color: #f6f6f6;
-    }
-
     .shortcut-label {
       color: #f6f6f6;
     }
