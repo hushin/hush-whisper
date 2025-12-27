@@ -29,6 +29,12 @@
   </div>
 
   <div class="sidebar-status">
+    <div class="status-indicator" class:recording={settingsStore.isRecording}>
+      <span class="status-icon">{settingsStore.isRecording ? "●" : "○"}</span>
+      <span class="status-text">
+        {settingsStore.isRecording ? "録音中" : "待機中"}
+      </span>
+    </div>
     <button
       class="record-button"
       class:recording={settingsStore.isRecording}
@@ -42,12 +48,6 @@
         ●
       {/if}
     </button>
-    <div class="status-indicator" class:recording={settingsStore.isRecording}>
-      <span class="status-icon">{settingsStore.isRecording ? "●" : "○"}</span>
-      <span class="status-text">
-        {settingsStore.isRecording ? "録音中" : "待機中"}
-      </span>
-    </div>
   </div>
 </aside>
 
