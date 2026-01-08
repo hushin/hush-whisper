@@ -113,8 +113,8 @@ struct ModelInfo {
 #[tauri::command]
 fn get_available_models() -> Vec<ModelInfo> {
     vec![
-        ModelInfo { name: "large-v3-turbo-q8_0".into(), filename: "ggml-large-v3-turbo-q8_0.bin".into(), size_hint: "~820MB (推奨)".into() },
-        ModelInfo { name: "large-v3-turbo".into(), filename: "ggml-large-v3-turbo.bin".into(), size_hint: "~1.5GB".into() },
+        ModelInfo { name: "large-v3-turbo".into(), filename: "ggml-large-v3-turbo.bin".into(), size_hint: "~1.5GB (推奨)".into() },
+        ModelInfo { name: "large-v3-turbo-q8_0".into(), filename: "ggml-large-v3-turbo-q8_0.bin".into(), size_hint: "~820MB".into() },
         ModelInfo { name: "medium".into(), filename: "ggml-medium.bin".into(), size_hint: "~1.5GB".into() },
         ModelInfo { name: "small".into(), filename: "ggml-small.bin".into(), size_hint: "~500MB".into() },
         ModelInfo { name: "base".into(), filename: "ggml-base.bin".into(), size_hint: "~150MB".into() },
