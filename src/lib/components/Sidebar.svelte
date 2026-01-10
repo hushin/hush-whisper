@@ -29,10 +29,28 @@
   </div>
 
   <div class="sidebar-status">
-    <div class="status-indicator" class:recording={settingsStore.isRecording}>
-      <span class="status-icon">{settingsStore.isRecording ? "●" : "○"}</span>
+    <div
+      class="status-indicator"
+      class:recording={settingsStore.isRecording}
+      class:llm-processing={settingsStore.isLlmRefining}
+    >
+      <span class="status-icon">
+        {#if settingsStore.isRecording}
+          ●
+        {:else if settingsStore.isLlmRefining}
+          ⟳
+        {:else}
+          ○
+        {/if}
+      </span>
       <span class="status-text">
-        {settingsStore.isRecording ? "録音中" : "待機中"}
+        {#if settingsStore.isRecording}
+          録音中
+        {:else if settingsStore.isLlmRefining}
+          LLM処理中
+        {:else}
+          待機中
+        {/if}
       </span>
     </div>
     <button
@@ -179,6 +197,10 @@
     color: #f5576c;
   }
 
+  .status-indicator.llm-processing {
+    color: #667eea;
+  }
+
   .status-icon {
     font-size: 0.9rem;
     display: inline-block;
@@ -187,6 +209,19 @@
 
   .status-indicator.recording .status-icon {
     animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .status-indicator.llm-processing .status-icon {
+    animation: spin 1.5s linear infinite;
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
   }
 
   .status-text {
@@ -243,6 +278,10 @@
 
     .status-indicator.recording {
       color: #f5576c;
+    }
+
+    .status-indicator.llm-processing {
+      color: #90caf9;
     }
   }
 </style>
