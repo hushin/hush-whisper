@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import { settingsStore } from "$lib/stores/settings.svelte";
 
+  let copiedEntryId: number | null = $state(null);
+
   function formatLogTimestamp(timestamp: string): string {
     const date = new Date(timestamp);
     return date.toLocaleString("ja-JP", {
@@ -11,6 +13,19 @@
       hour: "2-digit",
       minute: "2-digit",
     });
+  }
+
+  async function handleCopy(text: string, entryId: number, event: MouseEvent) {
+    event.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(text);
+      copiedEntryId = entryId;
+      setTimeout(() => {
+        copiedEntryId = null;
+      }, 1000);
+    } catch (error) {
+      alert("クリップボードへのコピーに失敗しました: " + error);
+    }
   }
 
   async function handleDeleteAll() {
@@ -99,6 +114,15 @@
                 <span class="log-badge llm">LLM</span>
               {/if}
               <button
+                class="copy-button"
+                onclick={(e) => handleCopy(entry.refined_text || entry.raw_text, entry.id, e)}
+                title="クリップボードにコピー"
+              >
+                <span class="copy-icon" class:copied={copiedEntryId === entry.id}>
+                  {copiedEntryId === entry.id ? "☑️" : "📋"}
+                </span>
+              </button>
+              <button
                 class="delete-button"
                 onclick={(e) => {
                   e.stopPropagation();
@@ -115,12 +139,34 @@
             {#if settingsStore.selectedLogEntry?.id === entry.id}
               <div class="log-details">
                 <div class="detail-row">
-                  <span class="detail-label">認識結果:</span>
+                  <div class="detail-header">
+                    <span class="detail-label">認識結果:</span>
+                    <button
+                      class="detail-copy-button"
+                      onclick={(e) => handleCopy(entry.raw_text, entry.id * 1000, e)}
+                      title="認識結果をコピー"
+                    >
+                      <span class="copy-icon" class:copied={copiedEntryId === entry.id * 1000}>
+                        {copiedEntryId === entry.id * 1000 ? "☑️" : "📋"}
+                      </span>
+                    </button>
+                  </div>
                   <span class="detail-value">{entry.raw_text}</span>
                 </div>
                 {#if entry.refined_text}
                   <div class="detail-row">
-                    <span class="detail-label">整形後:</span>
+                    <div class="detail-header">
+                      <span class="detail-label">整形後:</span>
+                      <button
+                        class="detail-copy-button"
+                        onclick={(e) => handleCopy(entry.refined_text || "", entry.id * 1000 + 1, e)}
+                        title="整形後をコピー"
+                      >
+                        <span class="copy-icon" class:copied={copiedEntryId === entry.id * 1000 + 1}>
+                          {copiedEntryId === entry.id * 1000 + 1 ? "☑️" : "📋"}
+                        </span>
+                      </button>
+                    </div>
                     <span class="detail-value">{entry.refined_text}</span>
                   </div>
                 {/if}
@@ -159,6 +205,57 @@
   /* コンポーネント固有のスタイル */
   .log-list {
     max-height: 300px;
+  }
+
+  .copy-icon {
+    display: inline-block;
+    transition: opacity 0.2s ease-in-out;
+  }
+
+  .copy-icon.copied {
+    animation: fadeCheck 1s ease-in-out;
+  }
+
+  @keyframes fadeCheck {
+    0% {
+      opacity: 0;
+      transform: scale(0.8);
+    }
+    20% {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+    80% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .detail-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .detail-copy-button {
+    padding: 0.1rem 0.3rem;
+    background-color: transparent;
+    color: #396cd8;
+    border: none;
+    border-radius: 3px;
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .detail-copy-button:hover {
+    background-color: rgba(57, 108, 216, 0.1);
   }
 
   .status-row {
@@ -268,6 +365,14 @@
 
     .result-text {
       color: #f6f6f6;
+    }
+
+    .detail-copy-button {
+      color: #90caf9;
+    }
+
+    .detail-copy-button:hover {
+      background-color: rgba(144, 202, 249, 0.1);
     }
   }
 </style>

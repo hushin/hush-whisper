@@ -223,6 +223,37 @@ input:checked + .slider:before {
   color: white;
 }
 
+.copy-button {
+  padding: 0.2rem 0.5rem;
+  background-color: transparent;
+  color: #396cd8;
+  border: none;
+  border-radius: 3px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.2s, opacity 0.3s ease-in-out;
+}
+
+.copy-button:hover {
+  background-color: rgba(57, 108, 216, 0.1);
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 .delete-button {
   margin-left: auto;
   padding: 0.2rem 0.5rem;
@@ -408,6 +439,14 @@ input:checked + .slider:before {
 
   .log-timestamp {
     color: #aaa;
+  }
+
+  .copy-button {
+    color: #90caf9;
+  }
+
+  .copy-button:hover {
+    background-color: rgba(144, 202, 249, 0.1);
   }
 
   .log-text-preview {
