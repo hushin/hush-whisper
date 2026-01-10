@@ -22,8 +22,8 @@ Windows 向けローカル音声入力アプリ
 
 ### 必要な環境
 
-- Node.js 18+
-- Rust 1.70+
+- Node.js 22+
+- Rust 1.90+
 - pnpm
 - Visual Studio 2022 (C++ ビルドツール)
 - CMake
