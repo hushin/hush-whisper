@@ -87,3 +87,7 @@ docs/            # 実装計画・詳細
   audio-pipeline.md  # 音声処理パイプライン
   model-management.md  # モデル管理（Phase 2 で実装予定）
 ```
+
+## License
+
+[MIT](LICENSE)
