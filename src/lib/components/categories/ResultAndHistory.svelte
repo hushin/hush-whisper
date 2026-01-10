@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import { settingsStore } from "$lib/stores/settings.svelte";
 
-  let copiedEntryId: number | null = $state(null);
+  let copiedEntryId: string | null = $state(null);
 
   function formatLogTimestamp(timestamp: string): string {
     const date = new Date(timestamp);
@@ -15,7 +15,7 @@
     });
   }
 
-  async function handleCopy(text: string, entryId: number, event: MouseEvent) {
+  async function handleCopy(text: string, entryId: string, event: MouseEvent) {
     event.stopPropagation();
     try {
       await navigator.clipboard.writeText(text);
@@ -143,11 +143,11 @@
                     <span class="detail-label">認識結果:</span>
                     <button
                       class="detail-copy-button"
-                      onclick={(e) => handleCopy(entry.raw_text, entry.id * 1000, e)}
+                      onclick={(e) => handleCopy(entry.raw_text, entry.id + '-raw', e)}
                       title="認識結果をコピー"
                     >
-                      <span class="copy-icon" class:copied={copiedEntryId === entry.id * 1000}>
-                        {copiedEntryId === entry.id * 1000 ? "☑️" : "📋"}
+                      <span class="copy-icon" class:copied={copiedEntryId === entry.id + '-raw'}>
+                        {copiedEntryId === entry.id + '-raw' ? "☑️" : "📋"}
                       </span>
                     </button>
                   </div>
@@ -159,11 +159,11 @@
                       <span class="detail-label">整形後:</span>
                       <button
                         class="detail-copy-button"
-                        onclick={(e) => handleCopy(entry.refined_text || "", entry.id * 1000 + 1, e)}
+                        onclick={(e) => handleCopy(entry.refined_text || "", entry.id + '-refined', e)}
                         title="整形後をコピー"
                       >
-                        <span class="copy-icon" class:copied={copiedEntryId === entry.id * 1000 + 1}>
-                          {copiedEntryId === entry.id * 1000 + 1 ? "☑️" : "📋"}
+                        <span class="copy-icon" class:copied={copiedEntryId === entry.id + '-refined'}>
+                          {copiedEntryId === entry.id + '-refined' ? "☑️" : "📋"}
                         </span>
                       </button>
                     </div>
