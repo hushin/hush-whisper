@@ -222,3 +222,77 @@ Phase 1 の全機能が実装完了しました。
 - `src-tauri/src/log/mod.rs` - ログ管理モジュール
 - ログ保存先: `%APPDATA%/voice-input/logs/YYYY-MM-DD.json`
 - フロントエンド: 履歴セクション
+
+---
+
+## Phase 4: UX 改善・最適化 ✅
+
+**目標**: 使い勝手向上、柔軟性強化
+
+> **注**: LLM は Ollama 連携のため、LLM 関連の管理は Ollama 側で行う
+
+### 4.1 優先タスク ✅
+
+#### ショートカットキーカスタマイズ ✅
+
+- 設定画面でショートカットキーを変更可能
+- デフォルト: Ctrl+Space
+
+**実装**:
+
+- `src-tauri/src/config/mod.rs` - 設定でショートカットキーを保存
+- `src-tauri/src/shortcuts/handler.rs` - 動的ショートカット登録
+- フロントエンド: ショートカットキー設定 UI
+
+#### 直接入力モード ✅
+
+- クリップボードに残さず直接ペースト
+- 出力先選択（クリップボードのみ / 直接入力 / 両方）
+
+**実装**:
+
+- `src-tauri/src/config/mod.rs` - OutputMode enum（Clipboard / DirectInput / Both）
+- `src-tauri/src/clipboard/mod.rs` - 出力モードに応じた処理
+- フロントエンド: 出力先選択 UI
+
+#### Whisper モデル切り替え ✅
+
+- 初期化済みでも別モデルを選択可能
+- モデル切り替え時に前モデルをアンロード（VRAM 解放）
+
+**実装**:
+
+- `src-tauri/src/whisper/transcribe.rs` - モデル再初期化ロジック
+- フロントエンド: モデル切り替え UI
+
+#### 履歴の自動更新 ✅
+
+- 録音完了時に履歴セクションを自動更新
+- 手動更新ボタン不要
+
+**実装**:
+
+- Tauri イベントシステムで録音完了を通知
+- フロントエンド: イベントリスナーで自動更新
+
+### 4.2 追加機能 ✅
+
+#### 設定項目 ✅
+
+- 最大録音時間（デフォルト 5 分）
+
+**実装**:
+
+- `src-tauri/src/config/mod.rs` - max_recording_duration 設定
+- `src-tauri/src/audio/capture.rs` - 録音時間チェック
+- フロントエンド: 最大録音時間設定 UI
+
+#### Windows スタートアップ登録 ✅
+
+- Windows スタートアップ登録（自動起動）
+
+**実装**:
+
+- `src-tauri/src/startup/mod.rs` - スタートアップ登録/解除
+- Windows レジストリ操作（`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`）
+- フロントエンド: スタートアップ設定トグル
