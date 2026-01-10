@@ -14,7 +14,8 @@
       {
         "title": "my-whisper-app",
         "width": 800,
-        "height": 800
+        "height": 800,
+        "visible": false
       }
     ],
     "security": {

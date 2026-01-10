@@ -677,6 +677,20 @@ pub fn run() {
             Some(vec!["--minimized"]),
         ))
         .setup(|app| {
+            // Check if launched with --minimized flag
+            let args: Vec<String> = std::env::args().collect();
+            let is_minimized = args.iter().any(|arg| arg == "--minimized");
+
+            // If not minimized (manual launch), show the window
+            if !is_minimized {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    tracing::info!("Window shown (manual launch)");
+                }
+            } else {
+                tracing::info!("Starting minimized (autostart)");
+            }
+
             // Load shortcut from settings
             let settings = config::load_settings();
             let shortcut_str = settings.shortcut.recording_toggle.clone();
