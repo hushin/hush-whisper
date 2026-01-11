@@ -1,8 +1,8 @@
-# HushWhisper
+# ![](src-tauri\icons\64x64.png) HushWhisper
 
 ローカル音声入力アプリ
 
-現状は Windows 向け
+![スクリーンショット](image-1.png)
 
 ## 🎯 主要機能
 
@@ -11,6 +11,10 @@
 - LLM による文章整形（Ollama 連携、カスタマイズ可能）
 - 完全ローカル処理（クラウド不要）
 - 履歴保存
+
+## 対応 OS
+
+- Windows
 
 ## 使い方
 
