@@ -1,4 +1,4 @@
-# VoiceInput 実装計画
+# HushWhisper 実装計画
 
 ## 概要
 

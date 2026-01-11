@@ -1,4 +1,4 @@
-# VoiceInput
+# HushWhisper
 
 Windows 向けローカル音声入力アプリ。グローバルショートカットで任意のアプリに日本語音声入力。
 

@@ -100,7 +100,7 @@ impl TrayManager {
         // Build tray icon
         let _tray = TrayIconBuilder::with_id(TRAY_ID)
             .icon(icon)
-            .tooltip("VoiceInput - 待機中")
+            .tooltip("HushWhisper - 待機中")
             .menu(&menu)
             .on_menu_event(move |app, event| {
                 match event.id().as_ref() {
@@ -203,19 +203,19 @@ fn update_tray_icon(app: &AppHandle, is_recording: bool, is_llm_processing: bool
             let icon_data = create_recording_icon();
             let icon = Image::new_owned(icon_data, 32, 32);
             let _ = tray.set_icon(Some(icon));
-            tray.set_tooltip(Some("VoiceInput - 録音中..."))
+            tray.set_tooltip(Some("HushWhisper - 録音中..."))
         } else if is_llm_processing {
             // LLM Processing: purple/blue circle icon
             let icon_data = create_llm_processing_icon();
             let icon = Image::new_owned(icon_data, 32, 32);
             let _ = tray.set_icon(Some(icon));
-            tray.set_tooltip(Some("VoiceInput - LLM処理中..."))
+            tray.set_tooltip(Some("HushWhisper - LLM処理中..."))
         } else {
             // Normal: default icon
             match Image::from_bytes(ICON_NORMAL) {
                 Ok(icon) => {
                     let _ = tray.set_icon(Some(icon));
-                    tray.set_tooltip(Some("VoiceInput - 待機中"))
+                    tray.set_tooltip(Some("HushWhisper - 待機中"))
                 }
                 Err(e) => {
                     tracing::error!("Failed to load normal icon: {}", e);

@@ -3,7 +3,7 @@
 </script>
 
 <div class="app-header">
-  <h1>VoiceInput</h1>
+  <h1>HushWhisper</h1>
   <p class="app-subtitle">ローカル音声入力アプリ</p>
 </div>
 

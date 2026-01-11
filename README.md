@@ -1,4 +1,4 @@
-# VoiceInput
+# HushWhisper
 
 ローカル音声入力アプリ
 
