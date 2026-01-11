@@ -1896,6 +1896,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
 
 [[package]]
+name = "hush-whisper"
+version = "0.1.0"
+dependencies = [
+ "arboard",
+ "chrono",
+ "cpal",
+ "enigo",
+ "futures-util",
+ "image",
+ "reqwest",
+ "rubato",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-opener",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "voice_activity_detector",
+ "whisper-rs",
+]
+
+[[package]]
 name = "hyper"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2569,32 +2595,6 @@ dependencies = [
  "serde",
  "thiserror 2.0.17",
  "windows-sys 0.60.2",
-]
-
-[[package]]
-name = "hush-whisper"
-version = "0.1.0"
-dependencies = [
- "arboard",
- "chrono",
- "cpal",
- "enigo",
- "futures-util",
- "image",
- "reqwest",
- "rubato",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-opener",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "voice_activity_detector",
- "whisper-rs",
 ]
 
 [[package]]
