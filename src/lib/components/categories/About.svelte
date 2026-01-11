@@ -57,6 +57,14 @@
     <p class="app-description">
       ローカル音声入力アプリ
     </p>
+    <a
+      href="https://github.com/hushin/hush-whisper"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="app-repository"
+    >
+      GitHub Repository
+    </a>
   </div>
 </div>
 
@@ -133,6 +141,18 @@
 
   .app-description {
     margin: 0.5rem 0 0;
+  }
+
+  .app-repository {
+    display: inline-block;
+    margin-top: 0.75rem;
+    color: var(--accent-color, #007aff);
+    text-decoration: none;
+    font-size: 0.875rem;
+  }
+
+  .app-repository:hover {
+    text-decoration: underline;
   }
 
   .tabs {
