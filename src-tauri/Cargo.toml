@@ -1,5 +1,5 @@
 [package]
-name = "my-whisper-app"
+name = "hush-whisper"
 version = "0.1.0"
 description = "A Tauri App"
 authors = ["you"]
