@@ -1,0 +1,11 @@
+[
+{{#each overview.used_by}}
+  {
+    "name": "{{name}}",
+    "version": "{{version}}",
+    "license": "{{#each licenses}}{{#if @first}}{{id}}{{/if}}{{/each}}",
+    "repository": "{{#if repository}}{{repository}}{{else}}{{/if}}",
+    "authors": "{{#each authors}}{{#if @first}}{{this}}{{/if}}{{/each}}"
+  }{{#unless @last}},{{/unless}}
+{{/each}}
+]

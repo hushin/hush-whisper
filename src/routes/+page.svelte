@@ -9,6 +9,7 @@
   import ShortcutAndOutput from "$lib/components/categories/ShortcutAndOutput.svelte";
   import LlmSettings from "$lib/components/categories/LlmSettings.svelte";
   import GeneralSettings from "$lib/components/categories/GeneralSettings.svelte";
+  import About from "$lib/components/categories/About.svelte";
 
   import { settingsStore } from "$lib/stores/settings.svelte";
   import type { DownloadProgress } from "$lib/types";
@@ -147,6 +148,8 @@
         <LlmSettings />
       {:else if settingsStore.activeCategory === "general"}
         <GeneralSettings />
+      {:else if settingsStore.activeCategory === "about"}
+        <About />
       {/if}
     </div>
   </div>

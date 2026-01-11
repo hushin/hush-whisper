@@ -4,7 +4,8 @@ export type CategoryId =
   | 'result-history'
   | 'shortcut-output'
   | 'llm'
-  | 'general';
+  | 'general'
+  | 'about';
 
 export interface Category {
   id: CategoryId;
@@ -17,6 +18,7 @@ export const categories: Category[] = [
   { id: 'llm', label: 'LLM' },
   { id: 'general', label: '環境設定' },
   { id: 'result-history', label: '結果・履歴' },
+  { id: 'about', label: 'About' },
 ];
 
 // Model types
