@@ -87,7 +87,7 @@ docs/            # 実装計画・詳細
   done.md        # 実装済み機能
   tech-stack.md  # 技術スタックと選定理由
   audio-pipeline.md  # 音声処理パイプライン
-  model-management.md  # モデル管理（Phase 2 で実装予定）
+  model-management.md  # モデル管理
 ```
 
 ## License
