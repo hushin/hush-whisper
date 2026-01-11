@@ -1,6 +1,8 @@
 # VoiceInput
 
-Windows 向けローカル音声入力アプリ
+ローカル音声入力アプリ
+
+Windows 向け
 
 ## 🎯 主要機能
 

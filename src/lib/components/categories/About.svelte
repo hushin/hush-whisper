@@ -55,7 +55,7 @@
     <p class="app-name">VoiceInput</p>
     <p class="app-version">Version 0.1.0</p>
     <p class="app-description">
-      Windows 向けローカル音声入力アプリ
+      ローカル音声入力アプリ
     </p>
   </div>
 </div>
