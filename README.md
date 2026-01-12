@@ -1,4 +1,4 @@
-# ![](src-tauri\icons\64x64.png) HushWhisper
+# HushWhisper
 
 ローカル音声入力アプリ
 
