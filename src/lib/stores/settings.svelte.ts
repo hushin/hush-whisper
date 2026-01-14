@@ -356,7 +356,7 @@ class SettingsStore {
 
   async savePromptSettings(preset: PromptPreset, customPrompt: string) {
     try {
-      await invoke("save_llm_prompt_settings", { preset, customPrompt });
+      await invoke("save_prompt_settings", { preset, customPrompt });
       this.promptPreset = preset;
       this.customPrompt = customPrompt;
       console.log("Saved prompt settings:", preset, customPrompt);
