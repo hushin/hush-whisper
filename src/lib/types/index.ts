@@ -43,15 +43,28 @@ export interface WhisperSettings {
 
 export type PromptPreset = 'Default' | 'Meeting' | 'Memo' | 'Chat' | 'Custom';
 
+export type LlmProvider = 'Ollama' | 'OpenAICompat';
+
 export type OutputMode = 'ClipboardOnly' | 'DirectInput' | 'Both';
 
 export interface LlmSettings {
   enabled: boolean;
-  ollama_url: string;
+  provider: LlmProvider;
+  api_url: string;
   model_name: string;
   preset: PromptPreset;
   custom_prompt: string;
 }
+
+export const llmProviderDescriptions: Record<LlmProvider, string> = {
+  Ollama: 'Ollama',
+  OpenAICompat: 'OpenAI互換 (LM Studio等)',
+};
+
+export const llmProviderDefaultUrls: Record<LlmProvider, string> = {
+  Ollama: 'http://localhost:11434',
+  OpenAICompat: 'http://localhost:1234',
+};
 
 export interface ShortcutSettings {
   recording_toggle: string;

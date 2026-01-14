@@ -9,7 +9,7 @@ mod whisper;
 
 use audio::{AudioCapture, Resampler, VadProcessor};
 use clipboard::ClipboardManager;
-use llm::OllamaClient;
+use llm::LlmClient;
 use shortcuts::ShortcutHandler;
 use tray::TrayManager;
 use whisper::WhisperTranscriber;
@@ -408,14 +408,21 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
     // Phase 2: LLM refinement (async, no locks held)
     let settings = config::load_settings();
     let final_text = if settings.llm.enabled {
-        tracing::info!("LLM refinement enabled, sending to Ollama...");
+        tracing::info!(
+            "LLM refinement enabled, sending to {:?}...",
+            settings.llm.provider
+        );
         app.emit("llm-refinement-started", ())
             .map_err(|e| format!("Failed to emit event: {}", e))?;
 
-        let ollama = OllamaClient::new(&settings.llm.ollama_url, &settings.llm.model_name);
+        let llm_client = LlmClient::new(
+            &settings.llm.api_url,
+            &settings.llm.model_name,
+            settings.llm.provider.clone(),
+        );
         let prompt_template = settings.llm.get_prompt_template();
         tracing::info!("Using prompt preset: {:?}", settings.llm.preset);
-        match ollama.refine_text_with_prompt(&text, &prompt_template).await {
+        match llm_client.refine_text_with_prompt(&text, &prompt_template).await {
             Ok(refined) => {
                 tracing::info!("LLM refined: {} -> {}", text, refined);
                 app.emit("llm-refinement-complete", refined.clone())
@@ -523,10 +530,19 @@ fn save_max_recording_seconds(max_seconds: u32) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn save_llm_settings(enabled: bool, ollama_url: String, model_name: String) -> Result<(), String> {
+fn save_llm_settings(
+    enabled: bool,
+    provider: String,
+    api_url: String,
+    model_name: String,
+) -> Result<(), String> {
     let mut settings = config::load_settings();
     settings.llm.enabled = enabled;
-    settings.llm.ollama_url = ollama_url;
+    settings.llm.provider = match provider.as_str() {
+        "OpenAICompat" => config::LlmProvider::OpenAICompat,
+        _ => config::LlmProvider::Ollama,
+    };
+    settings.llm.api_url = api_url;
     settings.llm.model_name = model_name;
     config::save_settings(&settings)
 }
@@ -608,8 +624,12 @@ fn save_shortcut_setting(app: AppHandle, state: State<'_, AppState>, shortcut: S
 }
 
 #[tauri::command]
-async fn check_ollama_status(ollama_url: String) -> Result<bool, String> {
-    let client = OllamaClient::new(&ollama_url, "");
+async fn check_llm_status(api_url: String, provider: String) -> Result<bool, String> {
+    let llm_provider = match provider.as_str() {
+        "OpenAICompat" => config::LlmProvider::OpenAICompat,
+        _ => config::LlmProvider::Ollama,
+    };
+    let client = LlmClient::new(&api_url, "", llm_provider);
     Ok(client.is_available().await)
 }
 
@@ -759,7 +779,7 @@ pub fn run() {
             save_output_mode,
             get_shortcut_setting,
             save_shortcut_setting,
-            check_ollama_status,
+            check_llm_status,
             get_recent_logs,
             get_logs_for_date,
             get_available_log_dates,

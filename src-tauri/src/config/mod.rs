@@ -70,6 +70,22 @@ impl Default for OutputMode {
     }
 }
 
+/// LLM API provider type
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum LlmProvider {
+    /// Ollama API (default)
+    Ollama,
+    /// OpenAI-compatible API (LM Studio, LocalAI, vLLM, etc.)
+    OpenAICompat,
+}
+
+impl Default for LlmProvider {
+    fn default() -> Self {
+        Self::Ollama
+    }
+}
+
+
 /// Available prompt presets
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PromptPreset {
@@ -144,8 +160,12 @@ pub fn get_preset_prompt(preset: &PromptPreset) -> &'static str {
 pub struct LlmSettings {
     /// Whether LLM refinement is enabled
     pub enabled: bool,
-    /// Ollama API base URL
-    pub ollama_url: String,
+    /// LLM API provider type
+    #[serde(default)]
+    pub provider: LlmProvider,
+    /// API base URL (supports both ollama_url for backwards compatibility)
+    #[serde(default = "default_llm_url", alias = "ollama_url")]
+    pub api_url: String,
     /// Model name to use
     pub model_name: String,
     /// Selected prompt preset
@@ -156,11 +176,16 @@ pub struct LlmSettings {
     pub custom_prompt: String,
 }
 
+fn default_llm_url() -> String {
+    "http://localhost:11434".to_string()
+}
+
 impl Default for LlmSettings {
     fn default() -> Self {
         Self {
             enabled: false,
-            ollama_url: "http://localhost:11434".to_string(),
+            provider: LlmProvider::default(),
+            api_url: "http://localhost:11434".to_string(),
             model_name: "gpt-oss:20b".to_string(),
             preset: PromptPreset::Default,
             custom_prompt: String::new(),

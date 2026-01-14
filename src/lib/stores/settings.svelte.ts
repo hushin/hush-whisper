@@ -5,9 +5,11 @@ import type {
   ModelInfo,
   Settings,
   PromptPreset,
+  LlmProvider,
   OutputMode,
   LogEntry,
 } from "$lib/types";
+import { llmProviderDefaultUrls } from "$lib/types";
 
 class SettingsStore {
   // UI state
@@ -23,10 +25,11 @@ class SettingsStore {
 
   // LLM settings
   llmEnabled = $state(false);
-  llmOllamaUrl = $state("http://localhost:11434");
+  llmProvider = $state<LlmProvider>("Ollama");
+  llmApiUrl = $state("http://localhost:11434");
   llmModelName = $state("gpt-oss:20b");
   llmStatus = $state<"unknown" | "connected" | "disconnected">("unknown");
-  isCheckingOllama = $state(false);
+  isCheckingLlm = $state(false);
   isLlmRefining = $state(false);
 
   // Prompt settings
@@ -106,7 +109,8 @@ class SettingsStore {
       this.insertNewline = settings.whisper.insert_newline ?? true;
       this.maxRecordingSeconds = settings.whisper.max_recording_seconds ?? 300;
       this.llmEnabled = settings.llm.enabled;
-      this.llmOllamaUrl = settings.llm.ollama_url;
+      this.llmProvider = settings.llm.provider || "Ollama";
+      this.llmApiUrl = settings.llm.api_url || llmProviderDefaultUrls[this.llmProvider];
       this.llmModelName = settings.llm.model_name;
       this.promptPreset = settings.llm.preset || "Default";
       this.customPrompt = settings.llm.custom_prompt || "";
@@ -174,7 +178,8 @@ class SettingsStore {
     try {
       await invoke("save_llm_settings", {
         enabled: this.llmEnabled,
-        ollamaUrl: this.llmOllamaUrl,
+        provider: this.llmProvider,
+        apiUrl: this.llmApiUrl,
         modelName: this.llmModelName,
       });
       console.log("Saved LLM settings");
@@ -183,20 +188,32 @@ class SettingsStore {
     }
   }
 
-  async checkOllamaConnection() {
-    this.isCheckingOllama = true;
+  async checkLlmConnection() {
+    this.isCheckingLlm = true;
     try {
-      const isAvailable: boolean = await invoke("check_ollama_status", {
-        ollamaUrl: this.llmOllamaUrl,
+      const isAvailable: boolean = await invoke("check_llm_status", {
+        apiUrl: this.llmApiUrl,
+        provider: this.llmProvider,
       });
       this.llmStatus = isAvailable ? "connected" : "disconnected";
-      console.log("Ollama status:", this.llmStatus);
+      console.log("LLM status:", this.llmStatus);
     } catch (error) {
       this.llmStatus = "disconnected";
-      console.error("Failed to check Ollama status:", error);
+      console.error("Failed to check LLM status:", error);
     } finally {
-      this.isCheckingOllama = false;
+      this.isCheckingLlm = false;
     }
+  }
+
+  setLlmProvider(provider: LlmProvider) {
+    this.llmProvider = provider;
+    // Set default URL for the provider if current URL is a default URL
+    const defaultUrls = Object.values(llmProviderDefaultUrls);
+    if (defaultUrls.includes(this.llmApiUrl)) {
+      this.llmApiUrl = llmProviderDefaultUrls[provider];
+    }
+    this.llmStatus = "unknown";
+    this.saveLlmSettings();
   }
 
   async initializeWhisper() {

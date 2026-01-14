@@ -1,6 +1,11 @@
 <script lang="ts">
   import { settingsStore } from "$lib/stores/settings.svelte";
-  import { presetDescriptions, type PromptPreset } from "$lib/types";
+  import {
+    presetDescriptions,
+    llmProviderDescriptions,
+    type PromptPreset,
+    type LlmProvider,
+  } from "$lib/types";
 
   function handlePresetChange(event: Event) {
     const select = event.target as HTMLSelectElement;
@@ -26,7 +31,7 @@
 </script>
 
 <div class="section">
-  <h2>LLM 整形設定 (Ollama)</h2>
+  <h2>LLM 整形設定</h2>
   <div class="llm-toggle">
     <label class="switch">
       <input
@@ -42,21 +47,35 @@
   {#if settingsStore.llmEnabled}
     <div class="llm-settings">
       <div class="input-group">
-        <label for="ollama-url">Ollama URL</label>
+        <label for="llm-provider">API プロバイダー</label>
+        <select
+          id="llm-provider"
+          value={settingsStore.llmProvider}
+          onchange={(e) => settingsStore.setLlmProvider((e.target as HTMLSelectElement).value as LlmProvider)}
+          class="provider-select"
+        >
+          {#each Object.entries(llmProviderDescriptions) as [value, label]}
+            <option {value}>{label}</option>
+          {/each}
+        </select>
+      </div>
+
+      <div class="input-group">
+        <label for="api-url">API URL</label>
         <div class="url-input-row">
           <input
             type="text"
-            id="ollama-url"
-            bind:value={settingsStore.llmOllamaUrl}
+            id="api-url"
+            bind:value={settingsStore.llmApiUrl}
             onblur={() => settingsStore.saveLlmSettings()}
-            placeholder="http://localhost:11434"
+            placeholder={settingsStore.llmProvider === "Ollama" ? "http://localhost:11434" : "http://localhost:1234"}
           />
           <button
             class="check-button"
-            onclick={() => settingsStore.checkOllamaConnection()}
-            disabled={settingsStore.isCheckingOllama}
+            onclick={() => settingsStore.checkLlmConnection()}
+            disabled={settingsStore.isCheckingLlm}
           >
-            {settingsStore.isCheckingOllama ? "確認中..." : "接続確認"}
+            {settingsStore.isCheckingLlm ? "確認中..." : "接続確認"}
           </button>
         </div>
         <div
@@ -138,7 +157,7 @@
   {/if}
 
   <p class="llm-hint">
-    有効にすると、音声認識結果を LLM で整形します。Ollama を事前に起動してください。
+    有効にすると、音声認識結果を LLM で整形します。Ollama または LM Studio などの OpenAI 互換サーバーを事前に起動してください。
   </p>
 </div>
 
