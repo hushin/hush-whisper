@@ -53,7 +53,7 @@
   <h2>About</h2>
   <div class="app-info">
     <p class="app-name">HushWhisper</p>
-    <p class="app-version">Version 0.1.0</p>
+    <p class="app-version">Version 0.1.1</p>
     <p class="app-description">
       ローカル音声入力アプリ
     </p>
