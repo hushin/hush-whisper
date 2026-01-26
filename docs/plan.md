@@ -8,7 +8,7 @@ Windows 向けローカル音声入力アプリ
 
 1. グローバルショートカットで任意アプリ上から音声入力
 2. 日本語音声認識（Whisper large-v3-turbo、CUDA）
-3. LLM による文章整形（Ollama 連携、カスタマイズ可能）
+3. LLM による文章整形（Ollama / LM Studio 等の OpenAI 互換 API 対応、カスタマイズ可能）
 4. 完全ローカル処理（クラウド不要）
 5. 音声入力ログ保存
 6. Whisper モデル自動ダウンロード

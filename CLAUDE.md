@@ -6,7 +6,7 @@ Windows 向けローカル音声入力アプリ。グローバルショートカ
 
 - **Framework**: Tauri 2.0 (Rust backend + Web frontend)
 - **Speech Recognition**: whisper-rs (whisper.cpp bindings, CUDA)
-- **LLM**: llama-cpp-rs (Qwen2.5-7B-Instruct Q4_K_M)
+- **LLM**: Ollama / OpenAI 互換 API (LM Studio, LocalAI, vLLM 等)
 - **Audio**: cpal + Silero VAD
 - **Frontend**: Svelte 5 + TypeScript
 
@@ -46,9 +46,10 @@ pnpm lint
 
 ## Key Constraints
 
-- 12GB VRAM budget: Whisper (~6GB) + LLM (~5GB)
-- No Python runtime - all inference in Rust
-- Models downloaded separately via hf-hub
+- Whisper: ~6GB VRAM (CUDA)
+- LLM は外部プロセスで管理（Ollama / LM Studio 等）
+- No Python runtime - Whisper inference in Rust
+- Models downloaded separately (Whisper: HuggingFace, LLM: Ollama/LM Studio で管理)
 - Target latency: <3 seconds end-to-end
 
 ## Documentation

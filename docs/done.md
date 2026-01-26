@@ -181,23 +181,26 @@ Phase 1 の全機能が実装完了しました。
 - Silero VAD V5 モデルで発話区間を検出
 - 512 サンプル (32ms) ごとに判定、パディング付き
 
-### 3.2 LLM 後処理（Ollama 連携）✅
+### 3.2 LLM 後処理（Ollama / OpenAI 互換 API 連携）✅
 
 > **注意**: whisper-rs-sys と llama-cpp-sys-2 の両方が ggml ライブラリを静的リンクするため、
-> リンク時に重複シンボルエラー（LNK2005）が発生する問題を回避するため、Ollama HTTP API を使用。
+> リンク時に重複シンボルエラー（LNK2005）が発生する問題を回避するため、HTTP API 経由で外部 LLM と連携。
 
-**前提条件**:
+**対応プロバイダー**:
 
-- Ollama をローカルで別途起動しておく
-- デフォルト URL: `http://localhost:11434`
-- デフォルトモデル: `gpt-oss:20b`
+- **Ollama**: ローカル LLM 実行環境
+  - デフォルト URL: `http://localhost:11434`
+  - API エンドポイント: `/api/generate`
+- **OpenAI 互換 API**: LM Studio, LocalAI, vLLM 等
+  - デフォルト URL: `http://localhost:1234`
+  - API エンドポイント: `/v1/chat/completions`
 
 **実装**:
 
-- `src-tauri/src/llm/mod.rs` - Ollama クライアントモジュール
-- HTTP API 経由でリクエスト（POST /api/generate）
+- `src-tauri/src/llm/mod.rs` - LLM クライアントモジュール
+- HTTP API 経由でリクエスト
 - 設定で LLM 有効/無効切り替え
-- 設定で Ollama URL・モデル名変更可能
+- 設定でプロバイダー選択、URL・モデル名変更可能
 
 ### 3.3 カスタムプロンプト ✅
 

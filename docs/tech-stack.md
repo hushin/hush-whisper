@@ -17,13 +17,14 @@
 | Resampling    | rubato     | 高品質リサンプリング                   |
 | VAD (計画中)  | Silero VAD | 音声区間検出、ハルシネーション防止     |
 
-## LLM・モデル管理（計画中）
+## LLM・文章整形
 
-| 領域           | 選定                | 理由                          |
-| -------------- | ------------------- | ----------------------------- |
-| LLM Runtime    | llama-cpp-rs        | GGUF 対応、成熟度高い         |
-| Model          | Qwen2.5-7B-Instruct | 日本語性能、128K コンテキスト |
-| Model Download | hf-hub              | HuggingFace 公式クライアント  |
+| 領域         | 選定                                   | 理由                                          |
+| ------------ | -------------------------------------- | --------------------------------------------- |
+| LLM 連携方式 | HTTP API                               | リンクエラー回避、柔軟性                      |
+| プロバイダー | Ollama / OpenAI 互換 API               | 複数の LLM ランタイムに対応                   |
+| Ollama       | http://localhost:11434/api/generate    | ローカル LLM 実行、シンプルな API             |
+| OpenAI 互換  | http://localhost:1234/v1/chat/completions | LM Studio, LocalAI, vLLM 等に対応         |
 
 ## システム統合
 
@@ -41,11 +42,12 @@
 | Build Tool      | Tauri CLI | Rust + Frontend 統合ビルド     |
 | Logging         | tracing   | 構造化ロギング、パフォーマンス |
 
-## VRAM 割り当て（想定）
+## VRAM 割り当て
 
 - Whisper large-v3-turbo (CUDA): ~6GB
-- Qwen2.5-7B-Instruct Q4_K_M: ~5GB
-- **合計**: ~11GB (RTX 4070 Ti 12GB で動作)
+- LLM は外部プロセス（Ollama / LM Studio 等）で管理
+  - VRAM 使用量は選択するモデルに依存
+  - Whisper と LLM を同時実行する場合は VRAM 容量に注意
 
 ## ビルド要件
 
