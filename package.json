@@ -13,7 +13,8 @@
     "clean": "cargo clean --manifest-path src-tauri/Cargo.toml",
     "gen-licenses:npm": "license-checker --json --production --out static/licenses/npm.json",
     "gen-licenses:rust": "cd src-tauri && cargo about generate --format json -o ../static/licenses/rust.json",
-    "gen-licenses": "node scripts/generate-licenses.js"
+    "gen-licenses": "node scripts/generate-licenses.js",
+    "bump": "node scripts/bump-version.js"
   },
   "license": "MIT",
   "dependencies": {
