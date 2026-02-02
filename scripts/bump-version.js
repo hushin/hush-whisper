@@ -71,16 +71,17 @@ function main() {
 
   console.log(`\n✨ Version bumped successfully!`);
   console.log(`\nNext steps:`);
+  console.log(`  cargo update -p hush-whisper --manifest-path src-tauri/Cargo.toml`);
   console.log(`  git add -A`);
-  console.log(`  git commit -m "chore: bump version to ${newVersion}"`);
+  console.log(`  git commit -m "fix: バージョン番号を ${oldVersion} から ${newVersion} に更新"`);
   console.log(`  git tag v${newVersion}`);
   console.log(`  git push && git push --tags`);
   console.log(`\nTo create a release after building:`);
   console.log(`  pnpm tauri build`);
-  console.log(`  gh release create v${newVersion} \\`);
-  console.log(`    "src-tauri/target/release/bundle/msi/hush-whisper_${newVersion}_x64_ja-JP.msi" \\`);
-  console.log(`    "src-tauri/target/release/bundle/nsis/hush-whisper_${newVersion}_x64-setup.exe" \\`);
-  console.log(`    --title "v${newVersion}" \\`);
+  console.log(`  gh release create v${newVersion} \``);
+  console.log(`    "src-tauri/target/release/bundle/msi/hush-whisper_${newVersion}_x64_ja-JP.msi" \``);
+  console.log(`    "src-tauri/target/release/bundle/nsis/hush-whisper_${newVersion}_x64-setup.exe" \``);
+  console.log(`    --title "v${newVersion}" \``);
   console.log(`    --notes "Release v${newVersion}"`);
 }
 
