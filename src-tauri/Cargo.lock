@@ -1919,6 +1919,7 @@ dependencies = [
  "tracing-subscriber",
  "voice_activity_detector",
  "whisper-rs",
+ "winreg 0.55.0",
 ]
 
 [[package]]

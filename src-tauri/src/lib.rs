@@ -18,7 +18,6 @@ use futures_util::StreamExt;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
-use tauri_plugin_autostart::MacosLauncher;
 use tokio::io::AsyncWriteExt;
 
 /// Available Whisper models with their URLs and filenames
@@ -676,10 +675,64 @@ fn set_autostart_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
     let autostart_manager = app.autolaunch();
     if enabled {
-        autostart_manager.enable().map_err(|e| e.to_string())
+        autostart_manager.enable().map_err(|e| e.to_string())?;
+        // Fix the registry entry to properly quote the path (Windows only)
+        #[cfg(target_os = "windows")]
+        fix_autostart_registry_path()?;
+        Ok(())
     } else {
         autostart_manager.disable().map_err(|e| e.to_string())
     }
+}
+
+/// Fix the autostart registry entry to properly quote paths with spaces
+#[cfg(target_os = "windows")]
+fn fix_autostart_registry_path() -> Result<(), String> {
+    use winreg::enums::*;
+    use winreg::RegKey;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let run_key = hkcu
+        .open_subkey_with_flags(
+            r"SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+            KEY_READ | KEY_WRITE,
+        )
+        .map_err(|e| format!("Failed to open registry key: {}", e))?;
+
+    // Get the current value
+    let current_value: String = run_key
+        .get_value("hush-whisper")
+        .map_err(|e| format!("Failed to read registry value: {}", e))?;
+
+    // Check if the path needs to be quoted (contains spaces and not already quoted)
+    if current_value.contains(' ') && !current_value.starts_with('"') {
+        // Split into exe path and arguments
+        let parts: Vec<&str> = current_value.splitn(2, ".exe").collect();
+        if parts.len() >= 1 {
+            let exe_path = format!("{}.exe", parts[0]);
+            let args = if parts.len() > 1 { parts[1].trim() } else { "" };
+
+            // Create the quoted value
+            let quoted_value = if args.is_empty() {
+                format!("\"{}\"", exe_path)
+            } else {
+                format!("\"{}\" {}", exe_path, args)
+            };
+
+            // Update the registry
+            run_key
+                .set_value("hush-whisper", &quoted_value)
+                .map_err(|e| format!("Failed to update registry value: {}", e))?;
+
+            tracing::info!(
+                "Fixed autostart registry path: {} -> {}",
+                current_value,
+                quoted_value
+            );
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -692,10 +745,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_autostart::init(
-            MacosLauncher::LaunchAgent,
-            Some(vec!["--minimized"]),
-        ))
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .args(["--minimized"])
+                .build(),
+        )
         .setup(|app| {
             // Check if launched with --minimized flag
             let args: Vec<String> = std::env::args().collect();

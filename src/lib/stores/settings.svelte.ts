@@ -273,13 +273,16 @@ class SettingsStore {
   }
 
   async toggleAutostart() {
+    const newValue = !this.autostartEnabled;
     try {
       this.isLoadingAutostart = true;
-      await invoke("set_autostart_enabled", { enabled: !this.autostartEnabled });
-      this.autostartEnabled = !this.autostartEnabled;
+      await invoke("set_autostart_enabled", { enabled: newValue });
+      this.autostartEnabled = newValue;
       console.log("Saved autostart enabled:", this.autostartEnabled);
     } catch (error) {
       console.error("Failed to save autostart setting:", error);
+      // Revert UI state on error by reloading
+      await this.loadAutostart();
     } finally {
       this.isLoadingAutostart = false;
     }

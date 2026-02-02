@@ -8,7 +8,7 @@
     <label class="switch">
       <input
         type="checkbox"
-        bind:checked={settingsStore.autostartEnabled}
+        checked={settingsStore.autostartEnabled}
         onchange={() => settingsStore.toggleAutostart()}
         disabled={settingsStore.isLoadingAutostart}
       />

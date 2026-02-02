@@ -53,4 +53,5 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 
 # Autostart
 tauri-plugin-autostart = "2"
+winreg = "0.55"
 
