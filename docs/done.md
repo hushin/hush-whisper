@@ -299,3 +299,40 @@ Phase 1 の全機能が実装完了しました。
 - `src-tauri/src/startup/mod.rs` - スタートアップ登録/解除
 - Windows レジストリ操作（`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`）
 - フロントエンド: スタートアップ設定トグル
+
+---
+
+## Phase 5: WinUI 3 移植 ✅
+
+Tauri 2.0 (Rust + Svelte) から **WinUI 3 + Windows App SDK (C# / .NET 9)** へ全面移植。
+
+### 方針
+
+- 配布形態: **Unpackaged (self-contained)**（ホットキー/トレイ/自動起動の実装容易性、MSIX 署名不要）
+- ASR: `whisper-rs` → **Whisper.net**（whisper.cpp の .NET バインディング。CUDA/Vulkan/CPU 自動選択）
+- Qwen3-ASR (Rust/candle 依存) は移植対象外（C# に相当実装がないため省略）
+- 設定形式は旧版と互換（`%APPDATA%/voice-input/config.json`）
+
+### 実装対応表
+
+| 旧 (Tauri/Rust)          | 新 (WinUI 3/C#)                                        |
+| ------------------------ | ----------------------------------------------------- |
+| `whisper-rs`             | `Whisper.net` + `Whisper.net.Runtime.Cuda`            |
+| `voice_activity_detector`| `WhisperVadFactory`（Silero VAD, ggml）               |
+| `cpal`                   | `NAudio` (WASAPI)                                     |
+| `rubato`                 | `WdlResamplingSampleProvider`                         |
+| `arboard` + `enigo`      | Win32 Clipboard API + `SendInput` (Shift+Insert)      |
+| `tauri-plugin-global-shortcut` | Win32 `RegisterHotKey`（専用メッセージウィンドウ） |
+| システムトレイ           | `H.NotifyIcon.WinUI`                                  |
+| `tauri-plugin-autostart` | レジストリ `HKCU\...\Run`                             |
+| Tauri コマンド/IPC       | DI + MVVM（サービス/ViewModel）                       |
+| Svelte 設定画面          | WinUI 3 XAML ページ（音声認識/ショートカット・出力/LLM/環境設定/結果・履歴/About） |
+
+### アーキテクチャ
+
+- `App.xaml.cs` で DI コンテナを構成（`Microsoft.Extensions.DependencyInjection`）
+- `Services/` に音声・ASR・VAD・LLM・出力・ホットキー・トレイ・ログを実装
+- `RecordingCoordinator` が録音→(VAD)→文字起こし→LLM 整形→出力→ログのパイプラインを統括
+- `ViewModels/` は CommunityToolkit.Mvvm（部分プロパティ + `[RelayCommand]`）
+- `MainWindow` は Mica + NavigationView シェル、トレイ常駐・閉じる=非表示・ホットキー登録を担当
+

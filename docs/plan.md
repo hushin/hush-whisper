@@ -21,11 +21,13 @@ Windows 向けローカル音声入力アプリ
 - **Phase 2: UX 改善** - 詳細は [`docs/done.md`](./done.md) を参照
 - **Phase 3: 精度向上・LLM 統合** - 詳細は [`docs/done.md`](./done.md) を参照
 - **Phase 4: UX 改善・最適化** - 詳細は [`docs/done.md`](./done.md) を参照
+- **Phase 5: WinUI 3 移植** - Tauri (Rust + Svelte) から WinUI 3 + Windows App SDK へ移植。詳細は [`docs/done.md`](./done.md) を参照
 
 ---
 
 ## 参考リソース
 
-- [whisper-rs](https://github.com/tazz4843/whisper-rs) - Whisper.cpp バインディング
+- [Whisper.net](https://github.com/sandrohanea/whisper.net) - whisper.cpp の .NET バインディング
+- [Windows App SDK](https://learn.microsoft.com/windows/apps/windows-app-sdk/) - WinUI 3 プラットフォーム
+- [CommunityToolkit.Mvvm](https://learn.microsoft.com/dotnet/communitytoolkit/mvvm/) - MVVM Toolkit
 - [Ollama](https://ollama.ai/) - ローカル LLM 実行環境
-- [Tauri 2.0 Docs](https://v2.tauri.app/) - フレームワークドキュメント

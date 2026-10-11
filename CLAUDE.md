@@ -4,60 +4,55 @@ Windows 向けローカル音声入力アプリ。グローバルショートカ
 
 ## Tech Stack
 
-- **Framework**: Tauri 2.0 (Rust backend + Web frontend)
-- **Speech Recognition**: whisper-rs (whisper.cpp bindings, CUDA)
-- **LLM**: Ollama / OpenAI 互換 API (LM Studio, LocalAI, vLLM 等)
-- **Audio**: cpal + Silero VAD
-- **Frontend**: Svelte 5 + TypeScript
+- **Framework**: WinUI 3 / Windows App SDK (C# / .NET 9, unpackaged)
+- **UI パターン**: MVVM (CommunityToolkit.Mvvm) + DI (Microsoft.Extensions.DependencyInjection)
+- **Speech Recognition**: Whisper.net (whisper.cpp bindings, CUDA 13/12, Vulkan, CPU を自動選択)
+- **VAD**: Whisper.net 内蔵 Silero VAD
+- **Audio**: NAudio (WASAPI + WDL リサンプラー)
+- **UI Shell**: MicaBackdrop + NavigationView
+- **LLM**: Ollama / OpenAI 互換 API (LM Studio, LocalAI 等)
 
 ## Project Structure
 
 ```
-src-tauri/       # Rust backend
-  src/
-    audio/       # Audio capture, VAD, resampling
-    whisper/     # Speech recognition
-    llm/         # Text refinement
-    shortcuts/   # Global hotkey handling
-src/             # Svelte frontend
-models/          # Downloaded models (git-ignored)
-docs/            # Implementation details (read as needed)
+HushWhisper/          # WinUI 3 アプリ本体
+  Interop/            # Win32 P/Invoke
+  Models/             # 設定・モデル定義・ログ型
+  Services/           # 音声, ASR, VAD, LLM, 出力, ホットキー, トレイ, ログ, 設定
+  ViewModels/         # 各ページの ViewModel
+  Views/              # 各設定ページ (XAML)
+  Assets/             # アイコン
+docs/                 # 実装計画・詳細 (必要に応じて参照)
 ```
 
 ## Commands
 
 ```bash
-# Development
-pnpm tauri dev
+# ビルド (ビルドチェックはこれを使用)
+dotnet build HushWhisper/HushWhisper.csproj -c Debug -p:Platform=x64
 
-# Build (use this for build check)
-pnpm tauri build
+# 実行
+dotnet run --project HushWhisper/HushWhisper.csproj -c Debug -p:Platform=x64
 
-# Test Rust
-cargo test --manifest-path src-tauri/Cargo.toml
+# リリースビルド
+dotnet publish HushWhisper/HushWhisper.csproj -c Release -r win-x64 -p:Platform=x64
 
-# Lint & Format
-cargo fmt --manifest-path src-tauri/Cargo.toml
-cargo clippy --manifest-path src-tauri/Cargo.toml
-pnpm lint
+# フォーマット
+dotnet format HushWhisper/HushWhisper.csproj
 ```
-
-**Note**: ビルドチェックには `pnpm tauri build` を使用すること。`cargo check` は依存関係の問題で失敗する場合がある。
 
 ## Key Constraints
 
-- Whisper: ~6GB VRAM (CUDA)
+- Whisper: ~6GB VRAM (CUDA, large-v3-turbo)。VAD も同プロセスで GPU を使う
 - LLM は外部プロセスで管理（Ollama / LM Studio 等）
-- No Python runtime - Whisper inference in Rust
-- Models downloaded separately (Whisper: HuggingFace, LLM: Ollama/LM Studio で管理)
+- No Python runtime
+- Models downloaded separately (Whisper: HuggingFace, VAD: Whisper.net downloader)
 - Target latency: <3 seconds end-to-end
+- 設定形式は `%APPDATA%/voice-input/config.json`（旧 Tauri 版と互換）
+- `LangVersion` は MVVM Toolkit 8.4 の部分プロパティ生成のため `preview` を指定
 
 ## Documentation
 
-詳細な実装ガイドは `docs/` 配下を参照:
-
-- `docs/plan.md` - 実装計画とフェーズ（Phase 2 以降）
-- `docs/done.md` - 実装済み機能（Phase 1 完了）
+- `docs/plan.md` - 実装計画
+- `docs/done.md` - 実装済み機能
 - `docs/tech-stack.md` - 技術スタックと選定理由
-- `docs/audio-pipeline.md` - 音声処理パイプライン（実装済み + 今後の計画）
-- `docs/model-management.md` - モデルダウンロード・管理（Phase 2 で実装予定）
