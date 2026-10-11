@@ -13,17 +13,23 @@ Windows 向けローカル音声入力アプリ。グローバルショートカ
 - 履歴保存
 - Windows 起動時の自動起動
 
-## 対応 OS
+## 動作要件
 
-- Windows 10 (1809 / build 17763) 以降
+- Windows 11（推奨）／ Windows 10 (1809 / build 17763) 以降
+- 64bit (x64) CPU
+- **追加ランタイムのインストールは不要**
+  - .NET 9 ランタイム、Windows App SDK、Visual C++ ランタイムを同梱しています
+- GPU アクセラレーション（任意）
+  - NVIDIA GPU がある場合は CUDA を自動使用（CUDA 13 対応ドライバ推奨）
+  - NVIDIA GPU が無い・非対応の場合も自動的に CPU で動作します（起動には影響しません）
 
 ## インストール
 
 1. [リリース](https://github.com/hushin/hush-whisper/releases) から配布物をダウンロード
 2. 任意のフォルダに展開し `HushWhisper.exe` を実行
 
-> 本アプリは Windows App SDK のセルフコンテインメント配布のため、
-> Windows App SDK ランタイムの別途インストールは不要です。
+> 本アプリは自己完結（self-contained）配布のため、.NET / Windows App SDK /
+> Visual C++ 各ランタイムの別途インストールは不要です。
 
 ## 使い方
 

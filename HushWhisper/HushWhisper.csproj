@@ -41,4 +41,21 @@
     <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!--
+    Visual C++ ランタイムをアプリローカルで同梱する。
+    whisper.dll / ggml-cuda-whisper.dll が VCRUNTIME140.dll / VCRUNTIME140_1.dll /
+    MSVCP140.dll を要求するため、配布先で別途インストール不要にする。
+  -->
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
+    <None Include="$(SystemRoot)\System32\vcruntime140.dll" Link="vcruntime140.dll"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
+          Condition="Exists('$(SystemRoot)\System32\vcruntime140.dll')" />
+    <None Include="$(SystemRoot)\System32\vcruntime140_1.dll" Link="vcruntime140_1.dll"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
+          Condition="Exists('$(SystemRoot)\System32\vcruntime140_1.dll')" />
+    <None Include="$(SystemRoot)\System32\msvcp140.dll" Link="msvcp140.dll"
+          CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"
+          Condition="Exists('$(SystemRoot)\System32\msvcp140.dll')" />
+  </ItemGroup>
+
 </Project>

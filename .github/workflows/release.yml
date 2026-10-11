@@ -1,0 +1,48 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Publish (self-contained, win-x64)
+        run: >-
+          dotnet publish HushWhisper/HushWhisper.csproj
+          -c Release -r win-x64 -p:Platform=x64 -p:SelfContained=true
+          -o dist
+
+      - name: Verify native resources
+        shell: pwsh
+        run: |
+          if (-not (Test-Path dist/HushWhisper.exe)) { throw "HushWhisper.exe is missing" }
+          if (-not (Test-Path dist/HushWhisper.pri)) { throw "HushWhisper.pri is missing" }
+          if (-not (Test-Path dist/vcruntime140.dll)) { throw "vcruntime140.dll is missing" }
+
+      - name: Create ZIP
+        shell: pwsh
+        run: |
+          $ver = $env:GITHUB_REF_NAME -replace '^v', ''
+          Compress-Archive -Path dist/* -DestinationPath "hush-whisper_${ver}_x64.zip"
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ver = $env:GITHUB_REF_NAME -replace '^v', ''
+          gh release create $env:GITHUB_REF_NAME --title "v$ver" --generate-notes "hush-whisper_${ver}_x64.zip"
