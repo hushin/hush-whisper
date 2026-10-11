@@ -58,6 +58,7 @@ class SettingsStore {
   isDownloading = $state(false);
   downloadProgress = $state<DownloadProgress | null>(null);
   transcriptionResult = $state("");
+  partialResult = $state("");
   statusMessage = $state("モデルを選択して初期化してください");
   errorMessage = $state("");
 

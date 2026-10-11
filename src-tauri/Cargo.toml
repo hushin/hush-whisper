@@ -33,6 +33,9 @@ voice_activity_detector = "0.2"
 # Whisper (Phase 1) - CUDA enabled for GPU acceleration
 whisper-rs = { version = "0.15", features = ["cuda"] }
 
+# Qwen3-ASR (pure Rust, candle-based) - CUDA + HF Hub auto-download
+qwen3-asr = { version = "0.2", default-features = false, features = ["cuda", "hub"] }
+
 # Model download & HTTP client
 reqwest = { version = "0.12", features = ["stream", "json"] }
 futures-util = "0.3"

@@ -1,15 +1,19 @@
+mod asr;
 mod audio;
 mod clipboard;
 mod config;
 mod llm;
 mod log;
+mod qwen3;
 mod shortcuts;
 mod tray;
 mod whisper;
 
+use asr::AsrEngine;
 use audio::{AudioCapture, Resampler, VadProcessor};
 use clipboard::ClipboardManager;
 use llm::LlmClient;
+use qwen3::Qwen3Transcriber;
 use shortcuts::ShortcutHandler;
 use tray::TrayManager;
 use whisper::WhisperTranscriber;
@@ -20,22 +24,83 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager, State, WindowEvent};
 use tokio::io::AsyncWriteExt;
 
-/// Available Whisper models with their URLs and filenames
-const MODELS: &[(&str, &str, &str)] = &[
-    ("large-v3-turbo-q8_0", "ggml-large-v3-turbo-q8_0.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q8_0.bin"),
-    ("large-v3-turbo", "ggml-large-v3-turbo.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin"),
-    ("medium", "ggml-medium.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin"),
-    ("small", "ggml-small.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"),
-    ("base", "ggml-base.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"),
-    ("tiny", "ggml-tiny.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"),
-];
-
-fn get_model_url(model_name: &str) -> Option<&'static str> {
-    MODELS.iter().find(|(name, _, _)| *name == model_name).map(|(_, _, url)| *url)
+/// Speech recognition model families.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ModelFamily {
+    /// whisper.cpp GGML model (single file download).
+    Whisper,
+    /// Qwen3-ASR model (HuggingFace Hub repo, multi-file download).
+    Qwen3,
 }
 
-fn get_model_filename(model_name: &str) -> Option<&'static str> {
-    MODELS.iter().find(|(name, _, _)| *name == model_name).map(|(_, filename, _)| *filename)
+struct ModelDef {
+    name: &'static str,
+    family: ModelFamily,
+    /// whisper.cpp: GGML filename. qwen3: HuggingFace repo id.
+    source: &'static str,
+    size_hint: &'static str,
+}
+
+/// Available speech recognition models.
+const MODELS: &[ModelDef] = &[
+    ModelDef {
+        name: "large-v3-turbo",
+        family: ModelFamily::Whisper,
+        source: "ggml-large-v3-turbo.bin",
+        size_hint: "~1.5GB (Whisper 推奨)",
+    },
+    ModelDef {
+        name: "large-v3-turbo-q8_0",
+        family: ModelFamily::Whisper,
+        source: "ggml-large-v3-turbo-q8_0.bin",
+        size_hint: "~820MB",
+    },
+    ModelDef {
+        name: "medium",
+        family: ModelFamily::Whisper,
+        source: "ggml-medium.bin",
+        size_hint: "~1.5GB",
+    },
+    ModelDef {
+        name: "small",
+        family: ModelFamily::Whisper,
+        source: "ggml-small.bin",
+        size_hint: "~500MB",
+    },
+    ModelDef {
+        name: "base",
+        family: ModelFamily::Whisper,
+        source: "ggml-base.bin",
+        size_hint: "~150MB",
+    },
+    ModelDef {
+        name: "tiny",
+        family: ModelFamily::Whisper,
+        source: "ggml-tiny.bin",
+        size_hint: "~77MB",
+    },
+    ModelDef {
+        name: "qwen3-asr-1.7b",
+        family: ModelFamily::Qwen3,
+        source: "Qwen/Qwen3-ASR-1.7B",
+        size_hint: "~4.5GB (日本語 高精度)",
+    },
+    ModelDef {
+        name: "qwen3-asr-0.6b",
+        family: ModelFamily::Qwen3,
+        source: "Qwen/Qwen3-ASR-0.6B",
+        size_hint: "~1.7GB (日本語 軽量)",
+    },
+];
+
+fn get_model(model_name: &str) -> Option<&'static ModelDef> {
+    MODELS.iter().find(|m| m.name == model_name)
+}
+
+const WHISPER_BASE_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main";
+
+fn get_whisper_url(filename: &str) -> String {
+    format!("{}/{}", WHISPER_BASE_URL, filename)
 }
 
 /// Expand Windows environment variables like %APPDATA%
@@ -65,13 +130,15 @@ pub struct AppState {
     audio_capture: Mutex<Option<AudioCapture>>,
     // Stream is not stored here because it's not Send
     active_stream: Mutex<Option<Box<cpal::Stream>>>,
-    whisper: Mutex<Option<WhisperTranscriber>>,
+    asr: Mutex<Option<AsrEngine>>,
     clipboard: Mutex<Option<ClipboardManager>>,
     vad: Mutex<Option<VadProcessor>>,
     is_recording: Mutex<bool>,
     current_shortcut: Mutex<String>,
     /// Handle for the auto-stop timer task
     auto_stop_handle: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
+    /// Handle for the live (partial) transcription task
+    live_transcribe_handle: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 // Manual Send/Sync implementation
@@ -85,12 +152,13 @@ impl AppState {
         Self {
             audio_capture: Mutex::new(None),
             active_stream: Mutex::new(None),
-            whisper: Mutex::new(None),
+            asr: Mutex::new(None),
             clipboard: Mutex::new(None),
             vad: Mutex::new(None),
             is_recording: Mutex::new(false),
             current_shortcut: Mutex::new(settings.shortcut.recording_toggle),
             auto_stop_handle: Mutex::new(None),
+            live_transcribe_handle: Mutex::new(None),
         }
     }
 }
@@ -107,21 +175,30 @@ struct ModelInfo {
     name: String,
     filename: String,
     size_hint: String,
+    family: String,
 }
 
 #[tauri::command]
 fn get_available_models() -> Vec<ModelInfo> {
-    vec![
-        ModelInfo { name: "large-v3-turbo".into(), filename: "ggml-large-v3-turbo.bin".into(), size_hint: "~1.5GB (推奨)".into() },
-        ModelInfo { name: "large-v3-turbo-q8_0".into(), filename: "ggml-large-v3-turbo-q8_0.bin".into(), size_hint: "~820MB".into() },
-        ModelInfo { name: "medium".into(), filename: "ggml-medium.bin".into(), size_hint: "~1.5GB".into() },
-        ModelInfo { name: "small".into(), filename: "ggml-small.bin".into(), size_hint: "~500MB".into() },
-        ModelInfo { name: "base".into(), filename: "ggml-base.bin".into(), size_hint: "~150MB".into() },
-        ModelInfo { name: "tiny".into(), filename: "ggml-tiny.bin".into(), size_hint: "~77MB".into() },
-    ]
+    MODELS
+        .iter()
+        .map(|m| ModelInfo {
+            name: m.name.to_string(),
+            filename: m.source.to_string(),
+            size_hint: m.size_hint.to_string(),
+            family: match m.family {
+                ModelFamily::Whisper => "whisper".to_string(),
+                ModelFamily::Qwen3 => "qwen3".to_string(),
+            },
+        })
+        .collect()
 }
 
-async fn download_model_internal(app: &AppHandle, model_url: &str, target_path: &PathBuf) -> Result<(), String> {
+async fn download_model_internal(
+    app: &AppHandle,
+    model_url: &str,
+    target_path: &PathBuf,
+) -> Result<(), String> {
     // Create parent directory if needed
     if let Some(parent) = target_path.parent() {
         tokio::fs::create_dir_all(parent)
@@ -191,51 +268,89 @@ async fn initialize_whisper(
     app: AppHandle,
     model_name: String,
 ) -> Result<String, String> {
-    tracing::info!("Initializing Whisper with model: {}", model_name);
+    tracing::info!("Initializing ASR with model: {}", model_name);
 
     // First, unload existing model if any (to release VRAM)
     {
-        let mut whisper_guard = state.whisper.lock().unwrap();
-        if whisper_guard.is_some() {
+        let mut guard = state.asr.lock().unwrap();
+        if guard.is_some() {
             tracing::info!("Unloading previous model to free VRAM");
-            *whisper_guard = None;
-            // Give CUDA time to clean up
-            drop(whisper_guard);
+            *guard = None;
+            // Give the GPU backend time to clean up
+            drop(guard);
             std::thread::sleep(std::time::Duration::from_millis(100));
         }
     }
 
-    // Get model info
-    let model_url = get_model_url(&model_name)
-        .ok_or_else(|| format!("Unknown model: {}", model_name))?;
-    let model_filename = get_model_filename(&model_name)
-        .ok_or_else(|| format!("Unknown model: {}", model_name))?;
+    let def = get_model(&model_name).ok_or_else(|| format!("Unknown model: {}", model_name))?;
 
-    // Construct model path: %APPDATA%/voice-input/models/<filename>
-    let base_path = expand_env_vars("%APPDATA%\\voice-input\\models");
-    let path = PathBuf::from(&base_path).join(model_filename);
+    match def.family {
+        ModelFamily::Whisper => {
+            let model_url = get_whisper_url(def.source);
 
-    tracing::info!("Model path: {:?}", path);
+            // Construct model path: %APPDATA%/voice-input/models/<filename>
+            let base_path = expand_env_vars("%APPDATA%\\voice-input\\models");
+            let path = PathBuf::from(&base_path).join(def.source);
 
-    // If model doesn't exist, download it
-    if !path.exists() {
-        tracing::info!("Model not found, starting download...");
-        app.emit("download-started", ())
-            .map_err(|e| format!("Failed to emit event: {}", e))?;
+            tracing::info!("Whisper model path: {:?}", path);
 
-        download_model_internal(&app, model_url, &path).await?;
+            // If model doesn't exist, download it
+            if !path.exists() {
+                tracing::info!("Model not found, starting download...");
+                app.emit("download-started", ())
+                    .map_err(|e| format!("Failed to emit event: {}", e))?;
 
-        app.emit("download-complete", ())
-            .map_err(|e| format!("Failed to emit event: {}", e))?;
+                download_model_internal(&app, &model_url, &path).await?;
+
+                app.emit("download-complete", ())
+                    .map_err(|e| format!("Failed to emit event: {}", e))?;
+            }
+
+            let transcriber = WhisperTranscriber::new(path)
+                .map_err(|e| format!("Failed to initialize Whisper: {}", e))?;
+
+            *state.asr.lock().unwrap() = Some(AsrEngine::Whisper(transcriber));
+
+            tracing::info!("Whisper initialized successfully");
+            Ok("Whisper initialized successfully".to_string())
+        }
+        ModelFamily::Qwen3 => {
+            let cache_dir = PathBuf::from(expand_env_vars("%APPDATA%\\voice-input\\models\\qwen3"));
+            let cache_dir_clone = cache_dir.clone();
+
+            // The `qwen3-asr` crate marks a completed download with a `.complete` file
+            // inside `{cache_dir}/{model_id.with('/', "--")}/`.
+            let marker = cache_dir
+                .join(def.source.replace('/', "--"))
+                .join(".complete");
+            let is_cached = marker.exists();
+
+            if !is_cached {
+                tracing::info!("Qwen3 model not cached, starting download...");
+                app.emit("download-started", ())
+                    .map_err(|e| format!("Failed to emit event: {}", e))?;
+            }
+
+            let repo_id = def.source.to_string();
+            // `from_pretrained` performs blocking IO (download + load), so run it
+            // off the async runtime.
+            let transcriber = tokio::task::spawn_blocking(move || {
+                Qwen3Transcriber::from_pretrained(&repo_id, &cache_dir_clone)
+            })
+            .await
+            .map_err(|e| format!("Qwen3 load task panicked: {}", e))??;
+
+            if !is_cached {
+                app.emit("download-complete", ())
+                    .map_err(|e| format!("Failed to emit event: {}", e))?;
+            }
+
+            *state.asr.lock().unwrap() = Some(AsrEngine::Qwen3(Box::new(transcriber)));
+
+            tracing::info!("Qwen3-ASR initialized successfully");
+            Ok("Qwen3-ASR initialized successfully".to_string())
+        }
     }
-
-    let transcriber = WhisperTranscriber::new(path)
-        .map_err(|e| format!("Failed to initialize Whisper: {}", e))?;
-
-    *state.whisper.lock().unwrap() = Some(transcriber);
-
-    tracing::info!("Whisper initialized successfully");
-    Ok("Whisper initialized successfully".to_string())
 }
 
 #[tauri::command]
@@ -249,8 +364,8 @@ async fn start_recording(state: State<'_, AppState>, app: AppHandle) -> Result<S
     let mut audio_capture_guard = state.audio_capture.lock().unwrap();
 
     if audio_capture_guard.is_none() {
-        let capture = AudioCapture::new()
-            .map_err(|e| format!("Failed to create audio capture: {}", e))?;
+        let capture =
+            AudioCapture::new().map_err(|e| format!("Failed to create audio capture: {}", e))?;
         *audio_capture_guard = Some(capture);
     }
 
@@ -293,6 +408,62 @@ async fn start_recording(state: State<'_, AppState>, app: AppHandle) -> Result<S
     app.emit("recording-started", ())
         .map_err(|e| format!("Failed to emit event: {}", e))?;
 
+    // Start live (partial) transcription for engines that support it.
+    {
+        let live_supported = state
+            .asr
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|e| e.supports_live())
+            .unwrap_or(false);
+
+        if live_supported {
+            let app_clone = app.clone();
+            let handle = tauri::async_runtime::spawn(async move {
+                let interval = std::time::Duration::from_millis(1500);
+                loop {
+                    tokio::time::sleep(interval).await;
+
+                    let st: State<AppState> = app_clone.state();
+                    if !*st.is_recording.lock().unwrap() {
+                        break;
+                    }
+
+                    let app_block = app_clone.clone();
+                    let partial = tokio::task::spawn_blocking(move || -> Option<String> {
+                        let st: State<AppState> = app_block.state();
+                        let raw = {
+                            let cap = st.audio_capture.lock().unwrap();
+                            cap.as_ref().map(|c| c.stop_recording())?
+                        };
+                        if raw.is_empty() {
+                            return None;
+                        }
+                        let sample_rate = {
+                            let cap = st.audio_capture.lock().unwrap();
+                            cap.as_ref().map(|c| c.get_sample_rate()).unwrap_or(16000)
+                        };
+                        let resampled = Resampler::new(16000).resample(&raw, sample_rate).ok()?;
+                        let guard = st.asr.lock().unwrap();
+                        let engine = guard.as_ref()?;
+                        engine.transcribe(&resampled, false).ok()
+                    })
+                    .await
+                    .ok()
+                    .flatten();
+
+                    if let Some(text) = partial {
+                        if !text.is_empty() {
+                            let _ = app_clone.emit("transcription-partial", text);
+                        }
+                    }
+                }
+            });
+            *state.live_transcribe_handle.lock().unwrap() = Some(handle);
+        }
+    }
+
     Ok("Recording started".to_string())
 }
 
@@ -304,6 +475,15 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
         if let Some(handle) = handle_guard.take() {
             handle.abort();
             tracing::info!("Auto-stop timer cancelled");
+        }
+    }
+
+    // Stop the live (partial) transcription task if running
+    {
+        let mut handle_guard = state.live_transcribe_handle.lock().unwrap();
+        if let Some(handle) = handle_guard.take() {
+            handle.abort();
+            tracing::info!("Live transcription task cancelled");
         }
     }
 
@@ -382,22 +562,21 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
         app.emit("transcription-started", ())
             .map_err(|e| format!("Failed to emit event: {}", e))?;
 
-        let whisper_settings = config::load_settings().whisper;
-        let whisper_guard = state.whisper.lock().unwrap();
-        let transcribed = if let Some(whisper) = whisper_guard.as_ref() {
-            // Use Whisper for transcription
-            whisper
-                .transcribe_with_options(&speech_data, whisper_settings.insert_newline)
+        let asr_settings = config::load_settings().whisper;
+        let asr_guard = state.asr.lock().unwrap();
+        let transcribed = if let Some(engine) = asr_guard.as_ref() {
+            engine
+                .transcribe(&speech_data, asr_settings.insert_newline)
                 .map_err(|e| format!("Failed to transcribe: {}", e))?
         } else {
-            // Fallback to dummy mode if Whisper not initialized
-            tracing::warn!("Whisper not initialized, using dummy mode");
+            // Fallback to dummy mode if no model is initialized
+            tracing::warn!("ASR engine not initialized, using dummy mode");
             format!(
                 "[デモモード] {}サンプルの音声を録音しました。モデルを読み込んでください。",
                 speech_data.len()
             )
         };
-        drop(whisper_guard);
+        drop(asr_guard);
 
         tracing::info!("Transcription result: {}", transcribed);
         transcribed
@@ -421,7 +600,10 @@ async fn stop_recording(state: State<'_, AppState>, app: AppHandle) -> Result<St
         );
         let prompt_template = settings.llm.get_prompt_template();
         tracing::info!("Using prompt preset: {:?}", settings.llm.preset);
-        match llm_client.refine_text_with_prompt(&text, &prompt_template).await {
+        match llm_client
+            .refine_text_with_prompt(&text, &prompt_template)
+            .await
+        {
             Ok(refined) => {
                 tracing::info!("LLM refined: {} -> {}", text, refined);
                 app.emit("llm-refinement-complete", refined.clone())
@@ -564,10 +746,22 @@ fn save_prompt_settings(preset: String, custom_prompt: String) -> Result<(), Str
 #[tauri::command]
 fn get_preset_prompts() -> Vec<(String, String)> {
     vec![
-        ("Default".to_string(), config::get_preset_prompt(&config::PromptPreset::Default).to_string()),
-        ("Meeting".to_string(), config::get_preset_prompt(&config::PromptPreset::Meeting).to_string()),
-        ("Memo".to_string(), config::get_preset_prompt(&config::PromptPreset::Memo).to_string()),
-        ("Chat".to_string(), config::get_preset_prompt(&config::PromptPreset::Chat).to_string()),
+        (
+            "Default".to_string(),
+            config::get_preset_prompt(&config::PromptPreset::Default).to_string(),
+        ),
+        (
+            "Meeting".to_string(),
+            config::get_preset_prompt(&config::PromptPreset::Meeting).to_string(),
+        ),
+        (
+            "Memo".to_string(),
+            config::get_preset_prompt(&config::PromptPreset::Memo).to_string(),
+        ),
+        (
+            "Chat".to_string(),
+            config::get_preset_prompt(&config::PromptPreset::Chat).to_string(),
+        ),
     ]
 }
 
@@ -590,10 +784,13 @@ fn get_shortcut_setting() -> String {
 }
 
 #[tauri::command]
-fn save_shortcut_setting(app: AppHandle, state: State<'_, AppState>, shortcut: String) -> Result<(), String> {
+fn save_shortcut_setting(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    shortcut: String,
+) -> Result<(), String> {
     // Validate shortcut first
-    shortcuts::parse_shortcut(&shortcut)
-        .map_err(|e| format!("Invalid shortcut: {}", e))?;
+    shortcuts::parse_shortcut(&shortcut).map_err(|e| format!("Invalid shortcut: {}", e))?;
 
     // Get current shortcut
     let current = state.current_shortcut.lock().unwrap().clone();
@@ -781,8 +978,16 @@ pub fn run() {
             });
 
             // Register global shortcut with callback (using saved shortcut or default)
-            if let Err(e) = ShortcutHandler::register_with_shortcut(app.handle(), &shortcut_str, toggle_callback) {
-                tracing::error!("Failed to register global shortcut '{}': {}", shortcut_str, e);
+            if let Err(e) = ShortcutHandler::register_with_shortcut(
+                app.handle(),
+                &shortcut_str,
+                toggle_callback,
+            ) {
+                tracing::error!(
+                    "Failed to register global shortcut '{}': {}",
+                    shortcut_str,
+                    e
+                );
                 // Fallback to default shortcut
                 let fallback_callback = Arc::new(|app_handle: &AppHandle| {
                     let app_clone = app_handle.clone();
@@ -803,7 +1008,10 @@ pub fn run() {
             if let Err(e) = tray_manager.setup(app.handle()) {
                 tracing::error!("Failed to setup system tray: {}", e);
             }
-            tracing::info!("Setup complete - tray and shortcuts registered (shortcut: {})", shortcut_str);
+            tracing::info!(
+                "Setup complete - tray and shortcuts registered (shortcut: {})",
+                shortcut_str
+            );
 
             Ok(())
         })

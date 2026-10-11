@@ -56,6 +56,7 @@
     // Listen for recording events
     const unlistenRecordingStarted = listen("recording-started", () => {
       settingsStore.isRecording = true;
+      settingsStore.partialResult = "";
       settingsStore.statusMessage = "録音中...";
       console.log("Recording started");
     });
@@ -72,11 +73,22 @@
       console.log("Transcription started");
     });
 
+    // Live (partial) transcription emitted while recording with a streaming engine
+    const unlistenTranscriptionPartial = listen<string>(
+      "transcription-partial",
+      (event) => {
+        settingsStore.partialResult = event.payload;
+        settingsStore.statusMessage = "録音中... (認識中)";
+        console.log("Partial transcription:", event.payload);
+      }
+    );
+
     const unlistenTranscriptionComplete = listen<string>(
       "transcription-complete",
       async (event) => {
         settingsStore.isTranscribing = false;
         settingsStore.transcriptionResult = event.payload;
+        settingsStore.partialResult = "";
         settingsStore.statusMessage = "認識完了 - クリップボードにコピーしました";
         console.log("Transcription complete:", event.payload);
 
@@ -123,6 +135,7 @@
       unlistenRecordingStarted.then((fn) => fn());
       unlistenRecordingStopped.then((fn) => fn());
       unlistenTranscriptionStarted.then((fn) => fn());
+      unlistenTranscriptionPartial.then((fn) => fn());
       unlistenTranscriptionComplete.then((fn) => fn());
       unlistenRecordingToggle.then((fn) => fn());
       unlistenRecordingAutoStopped.then((fn) => fn());
