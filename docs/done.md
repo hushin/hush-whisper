@@ -310,7 +310,7 @@ Tauri 2.0 (Rust + Svelte) から **WinUI 3 + Windows App SDK (C# / .NET 9)** へ
 
 - 配布形態: **Unpackaged (self-contained)**（ホットキー/トレイ/自動起動の実装容易性、MSIX 署名不要）
 - ASR: `whisper-rs` → **Whisper.net**（whisper.cpp の .NET バインディング。CUDA/Vulkan/CPU 自動選択）
-- Qwen3-ASR (Rust/candle 依存) は移植対象外（C# に相当実装がないため省略）
+- Qwen3-ASR は Rust/candle 依存のため当初は移植対象外だったが、**sherpa-onnx (ONNX Runtime)** の C# API 経由で実装。`qwen3-asr-0.6b` をモデル一覧から選択可能（推論エンジンは `Qwen3AsrService`）
 - 設定形式は旧版と互換（`%APPDATA%/voice-input/config.json`）
 
 ### 実装対応表
@@ -318,6 +318,7 @@ Tauri 2.0 (Rust + Svelte) から **WinUI 3 + Windows App SDK (C# / .NET 9)** へ
 | 旧 (Tauri/Rust)          | 新 (WinUI 3/C#)                                        |
 | ------------------------ | ----------------------------------------------------- |
 | `whisper-rs`             | `Whisper.net` + `Whisper.net.Runtime.Cuda`            |
+| `qwen3-asr` (Rust/candle) | `org.k2fsa.sherpa.onnx`（Qwen3-ASR ONNX / int8 0.6B） |
 | `voice_activity_detector`| `WhisperVadFactory`（Silero VAD, ggml）               |
 | `cpal`                   | `NAudio` (WASAPI)                                     |
 | `rubato`                 | `WdlResamplingSampleProvider`                         |

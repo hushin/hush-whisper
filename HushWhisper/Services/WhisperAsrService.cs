@@ -4,36 +4,9 @@ using Whisper.net;
 
 namespace HushWhisper.Services;
 
-public interface IAsrService
-{
-    bool IsLoaded { get; }
-
-    string? LoadedModel { get; }
-
-    IReadOnlyList<ModelInfo> AvailableModels { get; }
-
-    bool IsModelDownloaded(string modelName);
-
-    Task InitializeAsync(string modelName, IProgress<DownloadProgress>? progress = null, CancellationToken cancellationToken = default);
-
-    Task<string> TranscribeAsync(float[] audio16k, bool insertNewline, CancellationToken cancellationToken = default);
-
-    void Unload();
-}
-
-public sealed class WhisperAsrService : IAsrService
+public sealed class WhisperAsrService : IAsrEngine
 {
     private const string WhisperBaseUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main";
-
-    private static readonly ModelDef[] ModelDefs =
-    [
-        new("large-v3-turbo", ModelFamily.Whisper, "ggml-large-v3-turbo.bin", "~1.5GB (Whisper 推奨)"),
-        new("large-v3-turbo-q8_0", ModelFamily.Whisper, "ggml-large-v3-turbo-q8_0.bin", "~820MB"),
-        new("medium", ModelFamily.Whisper, "ggml-medium.bin", "~1.5GB"),
-        new("small", ModelFamily.Whisper, "ggml-small.bin", "~500MB"),
-        new("base", ModelFamily.Whisper, "ggml-base.bin", "~150MB"),
-        new("tiny", ModelFamily.Whisper, "ggml-tiny.bin", "~77MB"),
-    ];
 
     private static readonly HttpClient Http = new();
 
@@ -51,6 +24,8 @@ public sealed class WhisperAsrService : IAsrService
             "models");
     }
 
+    public ModelFamily Family => ModelFamily.Whisper;
+
     public bool IsLoaded
     {
         get
@@ -64,9 +39,7 @@ public sealed class WhisperAsrService : IAsrService
 
     public string? LoadedModel { get; private set; }
 
-    public IReadOnlyList<ModelInfo> AvailableModels { get; } = ModelDefs
-        .Select(m => new ModelInfo(m.Name, m.Source, m.SizeHint, "whisper"))
-        .ToList();
+    public IReadOnlyList<ModelInfo> AvailableModels { get; } = ModelCatalog.InfoFor(ModelFamily.Whisper);
 
     public bool IsModelDownloaded(string modelName)
     {
@@ -169,7 +142,17 @@ public sealed class WhisperAsrService : IAsrService
         _factory = null;
     }
 
-    private static ModelDef? GetModelDef(string name) => ModelDefs.FirstOrDefault(m => m.Name == name);
+    public void Dispose()
+    {
+        Unload();
+        _transcribeLock.Dispose();
+    }
+
+    private static ModelDef? GetModelDef(string name)
+    {
+        var def = ModelCatalog.Find(name);
+        return def is { Family: ModelFamily.Whisper } ? def : null;
+    }
 
     private string GetModelPath(ModelDef def) => Path.Combine(_modelDirectory, def.Source);
 

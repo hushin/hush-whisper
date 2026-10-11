@@ -32,6 +32,8 @@
     <PackageReference Include="Whisper.net" Version="*" />
     <PackageReference Include="Whisper.net.Runtime" Version="*" />
     <PackageReference Include="Whisper.net.Runtime.Cuda" Version="*" />
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="*" />
+    <PackageReference Include="SharpCompress" Version="0.50.5" />
   </ItemGroup>
 
   <ItemGroup>

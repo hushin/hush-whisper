@@ -50,7 +50,9 @@ public partial class App : Application
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<ILogService, LogService>();
         services.AddSingleton<IAudioCaptureService, AudioCaptureService>();
-        services.AddSingleton<IAsrService, WhisperAsrService>();
+        services.AddSingleton<WhisperAsrService>();
+        services.AddSingleton<Qwen3AsrService>();
+        services.AddSingleton<IAsrService, AsrService>();
         services.AddSingleton<ILlmService, LlmService>();
         services.AddSingleton<IClipboardService, ClipboardService>();
         services.AddSingleton<IStartupService, StartupService>();
