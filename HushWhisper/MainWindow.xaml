@@ -72,14 +72,7 @@
 
         <tb:TaskbarIcon x:Name="TrayIcon"
                         ToolTipText="HushWhisper - 待機中"
-                        NoLeftClickDelay="True">
-            <tb:TaskbarIcon.ContextFlyout>
-                <MenuFlyout>
-                    <MenuFlyoutItem Text="ウィンドウを表示" Click="TrayShow_Click" />
-                    <MenuFlyoutSeparator />
-                    <MenuFlyoutItem Text="終了" Click="TrayExit_Click" />
-                </MenuFlyout>
-            </tb:TaskbarIcon.ContextFlyout>
-        </tb:TaskbarIcon>
+                        MenuActivation="RightClick"
+                        NoLeftClickDelay="True" />
     </Grid>
 </Window>

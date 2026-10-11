@@ -38,6 +38,7 @@ public sealed partial class MainWindow : Window
 
         TrayIcon.Icon = TrayIconFactory.ForState(RecordingState.Idle);
         TrayIcon.LeftClickCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(ShowWindow);
+        TrayIcon.ContextFlyout = BuildTrayMenu();
         TrayIcon.ForceCreate(true);
 
         AppWindow.Closing += OnAppWindowClosing;
@@ -225,19 +226,74 @@ public sealed partial class MainWindow : Window
             return;
         }
 
+        AppLog.Write("Window close requested - hiding to tray");
+
         // Keep the app alive in the system tray instead of exiting.
         args.Cancel = true;
         sender.Hide();
     }
 
-    private void TrayShow_Click(object sender, RoutedEventArgs e) => ShowWindow();
-
-    private void TrayExit_Click(object sender, RoutedEventArgs e)
+    private MenuFlyout BuildTrayMenu()
     {
+        // H.NotifyIcon's default PopupMenu mode invokes the ICommand bound to each
+        // MenuFlyoutItem; it does NOT raise the Click event. So menus must use
+        // commands, never Click handlers.
+        var showItem = new MenuFlyoutItem
+        {
+            Text = "ウィンドウを表示",
+            Command = new CommunityToolkit.Mvvm.Input.RelayCommand(ShowWindow),
+        };
+        var exitItem = new MenuFlyoutItem
+        {
+            Text = "終了",
+            Command = new CommunityToolkit.Mvvm.Input.RelayCommand(ExitApp),
+        };
+
+        var menu = new MenuFlyout();
+        menu.Items.Add(showItem);
+        menu.Items.Add(new MenuFlyoutSeparator());
+        menu.Items.Add(exitItem);
+        return menu;
+    }
+
+    private void ExitApp()
+    {
+        AppLog.Write("Tray exit requested");
         _isExiting = true;
-        _hotkeys.Dispose();
-        TrayIcon.Dispose();
-        Application.Current.Exit();
+
+        try
+        {
+            _hotkeys.Dispose();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Hotkey dispose failed", ex);
+        }
+
+        try
+        {
+            TrayIcon.Dispose();
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("Tray dispose failed", ex);
+        }
+
+        // Application.Exit() can be ignored, so defer it and force-terminate if the
+        // process is somehow still alive shortly after.
+        _dispatcher.TryEnqueue(() =>
+        {
+            try
+            {
+                Application.Current.Exit();
+            }
+            catch (Exception ex)
+            {
+                AppLog.Write("Application.Exit failed", ex);
+            }
+
+            _ = Task.Delay(2000).ContinueWith(_ => Environment.Exit(0));
+        });
     }
 
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
