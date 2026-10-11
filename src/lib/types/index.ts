@@ -32,6 +32,7 @@ export interface ModelInfo {
   name: string;
   filename: string;
   size_hint: string;
+  family?: 'whisper' | 'qwen3';
 }
 
 // Settings types
