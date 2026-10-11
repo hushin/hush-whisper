@@ -8,7 +8,7 @@ public sealed partial class AboutViewModel : ViewModelBase
     public AboutViewModel()
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version;
-        Version = version is null ? "0.1.2" : $"{version.Major}.{version.Minor}.{version.Build}";
+        Version = version is null ? "0.2.0" : $"{version.Major}.{version.Minor}.{version.Build}";
     }
 
     public string Version { get; }
