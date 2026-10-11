@@ -1,3 +1,4 @@
 {
-  "svelte.enable-ts-plugin": true
+  "dotnet.defaultSolution": "HushWhisper.sln",
+  "editor.formatOnSave": true
 }
